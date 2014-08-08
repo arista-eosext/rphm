@@ -34,8 +34,19 @@
 #
 
 import sys
+import traceback
 
 import triggertrap.app
 
 if __name__ == "__main__":
-    sys.exit(triggertrap.app.main())
+    #sys.exit(triggertrap.app.main())
+    try:
+        triggertrap.app.main()
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception, exception:
+        print "Triggertrap FAILURE: {0}".format(exception)
+        print sys.exc_info()[0]
+        print traceback.format_exc()
+        sys.exit(1)
+
