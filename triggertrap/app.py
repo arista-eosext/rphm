@@ -54,6 +54,8 @@ LOGGING_FACILITY = __name__
 # EOS unix socket for syslog
 SYSLOG = '/dev/log'
 syslog_manager = None   #pylint: disable=C0103
+log_level = 'DEBUG'   #pylint: disable=C0103
+snmp_settings = None   #pylint: disable=C0103
 
 SYSTEM_ID = None
 def log(msg, level='info', error=False):
@@ -103,17 +105,13 @@ def parse_cmd_line():
                         choices=['debug', 'info', 'warning', 'error',
                                  'critical'],
                         help='Set logging level: debug, info, warning,' + \
-                        ' error, critical (default: INFO)'
-                        )
+                        ' error, critical (default: INFO)')
+    # TODO: This is not being used at this time.   Need to fix.
 
     parser.add_argument('--debug',
                         action='store_true',
                         default=False,
                         help='Send debug information to the console')
-
-    parser.add_argument('--logfile',
-                        type=str,
-                        help='Specifies an optional file for debug output')
 
     # Hidden options used for testing
     # Values:
@@ -126,6 +124,16 @@ def parse_cmd_line():
                         help=argparse.SUPPRESS)
 
     args = parser.parse_args()
+
+    global log_level
+    # assuming level is bound to the string value obtained from the
+    # command line argument. Convert to upper case to allow the user to
+    # specify --log=DEBUG or --log=debug
+    numeric_level = getattr(logging, args.log.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.log)
+    log_level = args.log.upper()
+    #logging.basicConfig(level=numeric_level)
 
     return vars(args)
 
@@ -408,19 +416,104 @@ def get_device_counters(device):
 
     return counters
 
-def compare_counters(reference, current):
-    ''' Compare the counters in 2 sets and return only differences
-    '''
+def compare_counters(device, reference, current):
+    """Compare the counters in 2 sets and return only differences
+
+    Args:
+        device (dict): A device config from the config_file
+        reference (dict): The previous iteration's stats
+        current (dict): The current iteration's stats
+
+    Returns:
+        dict: A dictionary of alert-able deltas for this device.
+
+    """
+
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
     diffs = {}
-    return diffs
+    for interface in reference:
+        log("Checking interface: {0}.".format(interface), level='debug')
 
-def send_traps(changes):
-    ''' Send SNMP traps for each delta noted in "changes"
-    '''
-    send_trap()
+        # Key interest areas: u'interfaceCounters' and u'interfaceStatistics'
 
-def send_trap(test=False):
+        if current[interface][u'interfaceCounters'][u'inUcastPkts'] != reference[interface][u'interfaceCounters'][u'inUcastPkts']:
+            #log("Counter {0} changed from {1} to {2}".format(key, reference[interface][key], current[interface][key]), level='info')
+            print "***Different**"
+        ref = reference[interface][u'interfaceCounters']
+        cur = current[interface][u'interfaceCounters']
+        diffs[interface] = {}
+        for key in ref:
+            if key in cur:
+                if key in device['counters']:
+                    # This counter is in the list we're checking
+                    if type(ref[key]) is dict:
+                        for subkey in ref[key]:
+                            if subkey in cur[key]:
+                                tmp = is_delta_significant(device,
+                                                           subkey,
+                                                           ref[key][subkey],
+                                                           cur[key][subkey])
+                                if tmp is not None:
+                                    diffs[interface][subkey] = tmp
+                            else:
+                                print "Key [{0}] in Reference not found in Current data set".format(subkey)
+                    else:
+                        tmp = is_delta_significant(device,
+                                                   key,
+                                                   ref[key],
+                                                   cur[key])
+                        if tmp is not None:
+                            diffs[interface][key] = tmp
+            else:
+                print "Key [{0}] in Reference not found in Current data set".format(key)
+
+        return diffs
+
+def is_delta_significant(device, counter, ref, cur):
+    """Verify whether the difference in a counter value, if any, between two
+    checks is equal to or greater than the set rate threshold for that counter.
+
+    If the delta of a counter between two readings is equal to or exceeds
+        the threshold value for that counter in the device config, then
+        send an SNMP trap.
+
+    Args:
+        device (dict): A device (switch) entry from the config file.
+        counter (str): The name of the counter being checked
+        ref (int): The reference value from the previous check
+        cur (int): The current reading
+
+    Returns:
+        dict: The counter containing the threshold and delta found
+            or None if the threshold was not exceeded.
+
+    Example:
+        {'collisions': {'threshold': 2,
+                        'found': 4}}
+
+    """
+
+    log("Comparing {0}[{1}]: REF [{2}], CUR [{3}]. "
+        "expecting < {4}".format(device['name'], counter, ref, cur,
+                                 device[counter.lower()]),
+        level='debug')
+    delta = cur - ref
+    #if delta >= int(device[counter.lower()]):
+    if delta < int(device[counter.lower()]):
+        return {'threshold': device[counter.lower()],
+                'found': delta}
+    else:
+        return None
+
+def send_traps(device, changes, interval):
+    """ Send SNMP traps for each delta noted in "changes"
+    """
+
+    for interface in changes:
+        for counter in changes[interface]:
+            send_trap(device, interface, counter, changes[interface], interval)
+
+def send_trap(device, interface, counter, changes, interval, test=False):
     """ Send an SNMP trap
 
     """
@@ -431,11 +524,26 @@ def send_trap(test=False):
               "NOTIFICATION-TEST-MIB::demo-notif", "SNMPv2-MIB::sysLocation.0",
               "s", "just here - v2"])
 
+    trap_content = "Host {0}, interface {1}: {2} increasing at > {3}/{4}sec [{5}]"\
+    .format(device['hostname'],
+            interface,
+            counter,
+            changes[counter]['threshold'],
+            interval,
+            changes[counter]['found'])
+    print "TRAP: %s" % trap_content
+
 class SyslogManager(object):
 
     def __init__(self):
         self.log = logging.getLogger(__name__)
-        logging.basicConfig(level=logging.DEBUG)
+        #logging.basicConfig(level=logging.DEBUG)
+        global log_level
+        level = log_level
+        numeric_level = getattr(logging, level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % level)
+        logging.basicConfig(level=numeric_level)
         self.log.setLevel(logging.DEBUG)
         self.formatter = logging.Formatter('ERRMON - %(levelname)s: '
                                            '%(message)s')
@@ -444,9 +552,22 @@ class SyslogManager(object):
         if os.path.isfile('/mnt/flash/startup-config'):
             self._add_syslog_handler()
 
+    #def setLevel(self, level):
+    #    # assuming level is bound to the string value obtained from the
+    #    # command line argument. Convert to upper case to allow the user to
+    #    # specify --log=DEBUG or --log=debug
+    #    numeric_level = getattr(logging, level.upper(), None)
+    #    if not isinstance(numeric_level, int):
+    #        raise ValueError('Invalid log level: %s' % level)
+    #    logging.basicConfig(level=numeric_level)
+    #    #handler.setLevel(level=logging.DEBUG)
+
+
     def _add_handler(self, handler, level=None):
         if level is None:
-            level = 'DEBUG'
+            #level = 'DEBUG'
+            global log_level
+            level = log_level
 
         try:
             handler.setLevel(logging.getLevelName(level))
@@ -497,13 +618,17 @@ def main():
     '''
 
     global syslog_manager
-
-    syslog_manager = SyslogManager()
+    global snmp_settings
 
     args = parse_cmd_line()
+    syslog_manager = SyslogManager()
+
+
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
 
     config = read_config(args['config'])
+
+    snmp_settings = config['snmp']
 
     if args['test'] == 'parse_only':
         print "\nargs:"
@@ -544,14 +669,15 @@ def main():
     while True:
         log("---sleeping for {0} seconds.".format(config['counters']['poll']))
         time.sleep(int(config['counters']['poll']))
-        #time.sleep(interval)
+
         for device in config['switches']:
             log("Polling {0}".format(device['name']))
             current = {}
             current = get_device_counters(device)
-            changes = compare_counters(reference, current)
+            changes = compare_counters(device, reference[device['hostname']], current)
 
-        send_traps(changes)
+
+            send_traps(device, changes, int(config['counters']['poll']))
 
         # Just once through for initial testing
         break
