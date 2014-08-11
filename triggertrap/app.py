@@ -53,9 +53,9 @@ import pprint
 LOGGING_FACILITY = __name__
 # EOS unix socket for syslog
 SYSLOG = '/dev/log'
-syslog_manager = None   #pylint: disable=C0103
-log_level = 'DEBUG'   #pylint: disable=C0103
-snmp_settings = None   #pylint: disable=C0103
+SYSLOG_MANAGER = None   #pylint: disable=C0103
+LOG_LEVEL = 'DEBUG'   #pylint: disable=C0103
+SNMP_SETTINGS = None   #pylint: disable=C0103
 
 SYSTEM_ID = None
 def log(msg, level='info', error=False):
@@ -74,8 +74,8 @@ def log(msg, level='info', error=False):
     if error:
         print 'ERROR: %s' % syslog_msg
 
-    if syslog_manager:
-        send_log = 'syslog_manager.log.' + level + '(syslog_msg)'
+    if SYSLOG_MANAGER:
+        send_log = 'SYSLOG_MANAGER.log.' + level + '(syslog_msg)'
         eval(send_log)
 
 def parse_cmd_line():
@@ -125,14 +125,14 @@ def parse_cmd_line():
 
     args = parser.parse_args()
 
-    global log_level
+    global LOG_LEVEL
     # assuming level is bound to the string value obtained from the
     # command line argument. Convert to upper case to allow the user to
     # specify --log=DEBUG or --log=debug
     numeric_level = getattr(logging, args.log.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % args.log)
-    log_level = args.log.upper()
+    LOG_LEVEL = args.log.upper()
     #logging.basicConfig(level=numeric_level)
 
     return vars(args)
@@ -256,18 +256,20 @@ def read_config(filename):
     #   sections. There will still be other unnecessary entries based on the
     #   defaults but this is a little easier to read, if troubleshooting.
     remove_unneded_keys(switchkeys, setting)
+    #TODO: Do similar to above for the switch sections, too.
 
     # Convert switchList from a string to config sections with defaults
     #  then make sure a section exists for each one in the event that this
     #  is the only place this switch is included in the config.
-    for line in setting['switches']['switchlist'].split("\n"):
-        for device in line.split(","):
-            device = device.strip('" \t')
-            if device:
-                for section in config.sections():
-                    if device not in config.get(section, 'hostname'):
-                        if not config.has_section(device):
-                            config.add_section(device)
+    if 'switchlist' in setting['switches']:
+        for line in setting['switches']['switchlist'].split("\n"):
+            for device in line.split(","):
+                device = device.strip('" \t')
+                if device:
+                    for section in config.sections():
+                        if device not in config.get(section, 'hostname'):
+                            if not config.has_section(device):
+                                config.add_section(device)
 
 
     # Any section remaining, should being a switch definition
@@ -414,19 +416,19 @@ def get_device_counters(device):
 
     counters = {}
     for interface in device['interfaces']:
-        switch = Server(device['url'])
-        get_interfaces(switch)
-        counters[interface] = get_intf_counters(switch, interface=interface)
+        get_interfaces(device['eapi_obj'])
+        counters[interface] = get_intf_counters(device['eapi_obj'], interface=interface)
 
     return counters
 
-def compare_counters(device, reference, current):
+def compare_counters(device, reference, current, test=None):
     """Compare the counters in 2 sets and return only differences
 
     Args:
         device (dict): A device config from the config_file
         reference (dict): The previous iteration's stats
         current (dict): The current iteration's stats
+        test (string): If test exists, automatically add a value to the counters
 
     Returns:
         dict: A dictionary of alert-able deltas for this device.
@@ -466,6 +468,8 @@ def compare_counters(device, reference, current):
                         if subkey not in device['counters']:
                             # This counter is in the list we're checking
                             continue
+                        if test:
+                            cur[key][subkey] += 3
                         tmp = is_delta_significant(device,
                                                    subkey,
                                                    ref[key][subkey],
@@ -476,6 +480,8 @@ def compare_counters(device, reference, current):
                 if key not in device['counters']:
                     # This counter is in the list we're checking
                     continue
+                if test:
+                    cur[key] += 3
                 tmp = is_delta_significant(device,
                                            key,
                                            ref[key],
@@ -518,8 +524,7 @@ def is_delta_significant(device, counter, ref, cur):
                                  device[counter.lower()]),
         level='debug')
     delta = cur - ref
-    #if delta >= int(device[counter.lower()]):
-    if delta < int(device[counter.lower()]):
+    if delta >= int(device[counter.lower()]):
         return {'threshold': device[counter.lower()],
                 'found': delta}
     else:
@@ -567,8 +572,8 @@ class SyslogManager(object):
     def __init__(self):
         self.log = logging.getLogger(__name__)
         #logging.basicConfig(level=logging.DEBUG)
-        global log_level
-        level = log_level
+        global LOG_LEVEL
+        level = LOG_LEVEL
         numeric_level = getattr(logging, level.upper(), None)
         if not isinstance(numeric_level, int):
             raise ValueError('Invalid log level: %s' % level)
@@ -595,8 +600,8 @@ class SyslogManager(object):
     def _add_handler(self, handler, level=None):
         if level is None:
             #level = 'DEBUG'
-            global log_level
-            level = log_level
+            global LOG_LEVEL
+            level = LOG_LEVEL
 
         try:
             handler.setLevel(logging.getLevelName(level))
@@ -646,18 +651,18 @@ def main():
         and then process the response.
     '''
 
-    global syslog_manager
-    global snmp_settings
+    global SYSLOG_MANAGER
+    global SNMP_SETTINGS
 
     args = parse_cmd_line()
-    syslog_manager = SyslogManager()
+    SYSLOG_MANAGER = SyslogManager()
 
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
 
     config = read_config(args['config'])
 
-    snmp_settings = config['snmp']
+    SNMP_SETTINGS = config['snmp']
 
     if args['test'] == 'parse_only':
         print "\nargs:"
@@ -688,6 +693,7 @@ def main():
     log("Getting baseline counters from each device.")
     for device in config['switches']:
         log("Connecting to {config['switches'][0]['url']}")
+        device['eapi_obj'] = Server(device['url'])
         reference[device['hostname']] = get_device_counters(device)
 
     # TODO: temporary for debugging
@@ -703,7 +709,7 @@ def main():
             log("Polling {0}".format(device['name']))
             current = {}
             current = get_device_counters(device)
-            changes = compare_counters(device, reference[device['hostname']], current)
+            changes = compare_counters(device, reference[device['hostname']], current, test=args['test'])
 
 
             send_traps(device, changes, int(config['counters']['poll']))
