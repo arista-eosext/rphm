@@ -237,12 +237,10 @@ def read_config(filename):
         'lateCollisions',
         'txPause'
     )
-    #config = ConfigParser.ConfigParser()
-    #config = ConfigParser.SafeConfigParser()
+
     config = ConfigParser.SafeConfigParser(defaults)
     config.read(filename)
 
-    #for section in ['DEFAULT', 'snmp', 'counters']:
     for section in ['switches', 'snmp', 'counters']:
         options = config.options(section)
 
@@ -256,40 +254,46 @@ def read_config(filename):
 
     # Clean up the switchOnly defaults that ConfigParser put in non-switch
     #   sections. There will still be other unnecessary entries based on the
-    #   defaults but this is a little easier to read, now.
+    #   defaults but this is a little easier to read, if troubleshooting.
     remove_unneded_keys(switchkeys, setting)
 
-    # Convert value of switchList to a python list
-    # TODO: remove [default][switchList]
+    # Convert switchList from a string to config sections with defaults
+    #  then make sure a section exists for each one in the event that this
+    #  is the only place this switch is included in the config.
+    for line in setting['switches']['switchlist'].split("\n"):
+        for device in line.split(","):
+            device = device.strip('" \t')
+            if device:
+                for section in config.sections():
+                    if device not in config.get(section, 'hostname'):
+                        if not config.has_section(device):
+                            config.add_section(device)
 
 
-    # Any section remaining, should be a switch parameter override.
+    # Any section remaining, should being a switch definition
     setting['switches'] = []
     for section in config.sections():
         switch = {}
-        #config.set(section, 'hostname', section)
         config.set(section, 'name', section)
 
         for option in config.options(section):
-            #switch[option] = config.get(section, option, 0, defaults)
             switch[option] = config.get(section, option)
 
         # unmangle counterlist from a string to a list
         switch['counters'] = []
-        for item in switch['counterlist'].split("\n"):
-            switch['counters'].append(item.strip('," \t'))
+        for line in switch['counterlist'].split("\n"):
+            for item in line.split(","):
+                switch['counters'].append(item.strip('" \t'))
         switch.pop('counterlist')
-
-        setting['switches'].append(switch)
 
         # unmangle interfacelist from a string to a list
         switch['interfaces'] = []
-        for item in switch['interfacelist'].split("\n"):
-            switch['interfaces'].append(item.strip('," \t'))
+        for line in switch['interfacelist'].split("\n"):
+            for item in line.split(","):
+                switch['interfaces'].append(item.strip('" \t'))
         switch.pop('interfacelist')
 
         setting['switches'].append(switch)
-
 
     return setting
 
@@ -514,8 +518,8 @@ def is_delta_significant(device, counter, ref, cur):
                                  device[counter.lower()]),
         level='debug')
     delta = cur - ref
-    #if delta < int(device[counter.lower()]):
-    if delta >= int(device[counter.lower()]):
+    #if delta >= int(device[counter.lower()]):
+    if delta < int(device[counter.lower()]):
         return {'threshold': device[counter.lower()],
                 'found': delta}
     else:
@@ -703,6 +707,8 @@ def main():
 
 
             send_traps(device, changes, int(config['counters']['poll']))
+
+            # Copy current stats-->reference
 
         # Just once through for initial testing
         break
