@@ -436,38 +436,54 @@ def compare_counters(device, reference, current):
 
         # Key interest areas: u'interfaceCounters' and u'interfaceStatistics'
 
-        if current[interface][u'interfaceCounters'][u'inUcastPkts'] != reference[interface][u'interfaceCounters'][u'inUcastPkts']:
-            #log("Counter {0} changed from {1} to {2}".format(key, reference[interface][key], current[interface][key]), level='info')
-            print "***Different**"
-        ref = reference[interface][u'interfaceCounters']
-        cur = current[interface][u'interfaceCounters']
+        try:
+            ref = reference[interface][u'interfaceCounters']
+        except KeyError:
+            log("Interface counters for [{0}] are not in reference dataset".format(interface))
+            continue
+
+        try:
+            cur = current[interface][u'interfaceCounters']
+        except KeyError:
+            log("Interface counters for [{0}] are not in current dataset".format(interface))
+            continue
+
         diffs[interface] = {}
         for key in ref:
-            if key in cur:
-                if key in device['counters']:
-                    # This counter is in the list we're checking
-                    if type(ref[key]) is dict:
-                        for subkey in ref[key]:
-                            if subkey in cur[key]:
-                                tmp = is_delta_significant(device,
-                                                           subkey,
-                                                           ref[key][subkey],
-                                                           cur[key][subkey])
-                                if tmp is not None:
-                                    diffs[interface][subkey] = tmp
-                            else:
-                                print "Key [{0}] in Reference not found in Current data set".format(subkey)
-                    else:
-                        tmp = is_delta_significant(device,
-                                                   key,
-                                                   ref[key],
-                                                   cur[key])
-                        if tmp is not None:
-                            diffs[interface][key] = tmp
-            else:
-                print "Key [{0}] in Reference not found in Current data set".format(key)
 
-        return diffs
+            if key not in cur:
+                log("Key [{0}] in Reference not found in Current data set".format(key))
+
+            if type(ref[key]) is dict:
+                for subkey in ref[key]:
+                    if subkey not in cur[key]:
+                        log("Key [{0}] in Reference not found in Current data set".format(subkey))
+                    else:
+                        if subkey not in device['counters']:
+                            # This counter is in the list we're checking
+                            continue
+                        tmp = is_delta_significant(device,
+                                                   subkey,
+                                                   ref[key][subkey],
+                                                   cur[key][subkey])
+                        if tmp is not None:
+                            diffs[interface][subkey] = tmp
+            else:
+                if key not in device['counters']:
+                    # This counter is in the list we're checking
+                    continue
+                tmp = is_delta_significant(device,
+                                           key,
+                                           ref[key],
+                                           cur[key])
+                if tmp is not None:
+                    diffs[interface][key] = tmp
+
+        # Remove the interface entry if there were no results to report
+        if not diffs[interface].keys():
+            diffs.pop(interface)
+
+    return diffs
 
 def is_delta_significant(device, counter, ref, cur):
     """Verify whether the difference in a counter value, if any, between two
@@ -498,8 +514,8 @@ def is_delta_significant(device, counter, ref, cur):
                                  device[counter.lower()]),
         level='debug')
     delta = cur - ref
-    #if delta >= int(device[counter.lower()]):
-    if delta < int(device[counter.lower()]):
+    #if delta < int(device[counter.lower()]):
+    if delta >= int(device[counter.lower()]):
         return {'threshold': device[counter.lower()],
                 'found': delta}
     else:
@@ -532,6 +548,15 @@ def send_trap(device, interface, counter, changes, interval, test=False):
             interval,
             changes[counter]['found'])
     print "TRAP: %s" % trap_content
+
+    enterprise_oid = '1.3.6.1.4.1.30065'
+    generic_trapnum = 6
+    specific_trapnum = 1
+    trap_oid = '1.3.6.1.4.1.30065.0.1'
+    print "Trapinfo: {0} {1} {2} {3}".format(enterprise_oid,
+                                             generic_trapnum,
+                                             specific_trapnum,
+                                             trap_oid)
 
 class SyslogManager(object):
 
