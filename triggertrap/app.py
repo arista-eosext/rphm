@@ -339,10 +339,9 @@ def get_interfaces(switch):
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     response = switch.runCmds(1, ["show interfaces status"])
-    """ Unable to connect raises
-        raise err
-        error: [Errno 60] Operation timed out
-    """
+    # Unable to connect raises
+    #    raise err
+    #    error: [Errno 60] Operation timed out
 
     return response[0][u'interfaceStatuses']
 
@@ -360,9 +359,6 @@ def get_device_status(device):
     response = device['eapi_obj'].runCmds(1, ["show version"])
     device['modelName'] = response[0]['modelName']
     device['bootupTimestamp'] = response[0][u'bootupTimestamp']
-    #from time import asctime, localtime
-    #print "Uptime: {0}".
-    #format(asctime(localtime(response[0][u'bootupTimestamp'])))
 
 def get_intf_counters(switch, interface="Management 1"):
     """Get interface details for an interface
@@ -592,7 +588,7 @@ def send_traps(device, changes, interval):
                    interval,
                    changes[interface][counter]['found'])
 
-            # TODO system uptime
+            # system uptime
             send_trap(trap_content, uptime=device['bootupTimestamp'])
 
 def send_trap(message, uptime='', test=False):
@@ -610,10 +606,11 @@ def send_trap(message, uptime='', test=False):
     log("Sending SNMPTRAP to {0}: {1}".format(SNMP_SETTINGS['traphost'],
                                               message))
 
-    """ NOTE: snmptrap caveat: Generates an error when run as unprivileged user.
-    Failed to create the persistent directory for /var/net-snmp/snmpapp.conf
-    http://sourceforge.net/p/net-snmp/bugs/1706/
-    """
+    # NOTE: snmptrap caveat: Generates an error when run as unprivileged user.
+    #    Failed to create the persistent directory for
+    #    /var/net-snmp/snmpapp.conf
+    #    http://sourceforge.net/p/net-snmp/bugs/1706/
+    #
 
     # Build the arguments to snmptrap
     trap_args = ['snmptrap']
