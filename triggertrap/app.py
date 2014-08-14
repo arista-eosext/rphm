@@ -63,9 +63,10 @@ def log(msg, level='INFO', error=False):
 
     if error:
         level = "ERR"
-        print 'ERROR: %s' % msg
+        print "ERROR: {0} ({1}) {2}".format(os.path.basename(sys.argv[0]),
+                                            level, msg)
 
-    priority = "syslog.LOG_" + level
+    priority = ''.join("syslog.LOG_", level)
     syslog.syslog(eval(priority), msg)
 
 def parse_cmd_line():
@@ -697,9 +698,7 @@ def main():
         return 0
 
     elif args['test'] == 'get':
-        #logger.debug("Connecting to {config['switches'][0]['url']}")
-        #logger.debug("Connecting to {0}".format(config['switches'][0]['url']))
-        print "Connecting to {0}".format(config['switches'][0]['url'])
+        print "Connecting to eAPI at {0}".format(config['switches'][0]['url'])
         switch = Server(config['switches'][0]['url'])
         counters = get_intf_counters(switch, interface="Management 1")
         print "\nTest=get: received the following counters from Management 1:"
@@ -713,7 +712,7 @@ def main():
 
     log("Getting baseline counters from each device.")
     for device in config['switches']:
-        log("Connecting to {0}".format(device['url']))
+        log("Connecting to eAPI on {0}".format(device['name']))
         device['eapi_obj'] = Server(device['url'])
         reference[device['hostname']] = get_device_counters(device)
 
