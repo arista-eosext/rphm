@@ -483,9 +483,9 @@ def compare_counters(device, reference, current, test=None):
 
         diffs[interface] = {}
         for counter in device['counters']:
-            ref_counter = [entry for entry in get_all(ref, counter)]
+            ref_counter = list(get_all(ref, counter))
+            cur_counter = list(get_all(cur, counter))
 
-            cur_counter = [entry for entry in get_all(cur, counter)]
             if not ref_counter or not cur_counter:
                 log("Counter [{0}] missing from Reference or Current data" \
                     " set. Skipping.".format(counter), error=True)
