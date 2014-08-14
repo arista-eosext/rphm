@@ -36,46 +36,37 @@
 
 import argparse
 import ConfigParser
-import logging
-from logging.handlers import SysLogHandler
 import time
-
 import os
 import sys
-import re
-
+import syslog
+import pprint
 from jsonrpclib import Server
 from subprocess import call
-import pprint
 
-
-LOGGING_FACILITY = __name__
-# EOS unix socket for syslog
-SYSLOG = '/dev/log'
-SYSLOG_MANAGER = None   #pylint: disable=C0103
-LOG_LEVEL = 'DEBUG'   #pylint: disable=C0103
 SNMP_SETTINGS = None   #pylint: disable=C0103
+DEBUG = False   #pylint: disable=C0103
 
-SYSTEM_ID = None
-def log(msg, level='info', error=False):
+def log(msg, level='INFO', error=False):
     """Logging facility setup.
 
     args:
         msg (str): The message to log.
+        level (str): The priority level for the message. (Default: INFO)
+                    See :mod:`syslog` for more options.
         error (bool): Flag if this is an error condition.
 
     """
-    if SYSTEM_ID:
-        syslog_msg = '%s: %s' % (SYSTEM_ID, msg)
-    else:
-        syslog_msg = msg
+
+    if DEBUG:
+        print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
 
     if error:
-        print 'ERROR: %s' % syslog_msg
+        level = "ERR"
+        print 'ERROR: %s' % msg
 
-    if SYSLOG_MANAGER:
-        send_log = 'SYSLOG_MANAGER.log.' + level + '(syslog_msg)'
-        eval(send_log)
+    priority = "syslog.LOG_" + level
+    syslog.syslog(eval(priority), msg)
 
 def parse_cmd_line():
     """Parse the command line options and return an args dict.
@@ -86,6 +77,7 @@ def parse_cmd_line():
         dict: A dictionary of CLI arguments.
 
     """
+
     parser = argparse.ArgumentParser(
         description=(
             'Poll switches with eAPI then send SNMP trap on changes in'
@@ -98,15 +90,6 @@ def parse_cmd_line():
                         '(Default: /persist/sys/triggertrap.conf)'
                        )
 
-    parser.add_argument('--log',
-                        action='store',
-                        default='WARNING',
-                        choices=['debug', 'info', 'warning', 'error',
-                                 'critical'],
-                        help='Set logging level: debug, info, warning,' + \
-                        ' error, critical (default: INFO)')
-    # TODO: This is not being used at this time.   Need to fix.
-
     parser.add_argument('--debug',
                         action='store_true',
                         default=False,
@@ -116,7 +99,9 @@ def parse_cmd_line():
     # Values:
     #   parse_only   Only parse the command line.
     #   get          Get one set of interface stats and dump to console.
-    #   send         Send a test snmp trap.
+    #   trap         Send a test snmp trap.
+    #   snmp         Add random number to counters to trigger snmptraps
+    #                  and display args sent to snmptrap command
     parser.add_argument('--test',
                         type=str,
                         default='',
@@ -124,14 +109,17 @@ def parse_cmd_line():
 
     args = parser.parse_args()
 
-    global LOG_LEVEL
+    global DEBUG
+    DEBUG = args.debug
+
+    #global LOG_LEVEL
     # assuming level is bound to the string value obtained from the
     # command line argument. Convert to upper case to allow the user to
     # specify --log=DEBUG or --log=debug
-    numeric_level = getattr(logging, args.log.upper(), None)
-    if not isinstance(numeric_level, int):
-        raise ValueError('Invalid log level: %s' % args.log)
-    LOG_LEVEL = args.log.upper()
+    #numeric_level = getattr(logging, args.log.upper(), None)
+    #if not isinstance(numeric_level, int):
+    #    raise ValueError('Invalid log level: %s' % args.log)
+    #LOG_LEVEL = args.log.upper()
     #logging.basicConfig(level=numeric_level)
 
     return vars(args)
@@ -153,7 +141,7 @@ def remove_unneded_keys(keys, this_dict):
 
     """
 
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     #print "cleaning up keys"
     for section in this_dict:
         #print "    cleaning up section {0}".format(section)
@@ -346,7 +334,7 @@ def get_interfaces(switch):
                                             u'vlanId': 1}}
     """
 
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     response = switch.runCmds(1, ["show interfaces status"])
     """ Unable to connect raises
         raise err
@@ -365,7 +353,7 @@ def get_device_status(device):
 
     """
 
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     response = device['eapi_obj'].runCmds(1, ["show version"])
     device['modelName'] = response[0]['modelName']
     device['bootupTimestamp'] = response[0][u'bootupTimestamp']
@@ -435,7 +423,7 @@ def get_intf_counters(switch, interface="Management 1"):
          u'physicalAddress': u'08:00:27:72:f6:77'}}}
 
     """
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     response = switch.runCmds(1, ["show interfaces {0}".format(interface)])
     #pprint.pprint(response[0])
     return response[0][u'interfaces'][interface.replace(" ", "")]
@@ -444,7 +432,7 @@ def get_device_counters(device):
     """ Get counters from a device and return a dict of results
 
     """
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
 
     counters = {}
     for interface in device['interfaces']:
@@ -468,10 +456,10 @@ def compare_counters(device, reference, current, test=None):
 
     """
 
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     diffs = {}
     for interface in reference:
-        log("Checking interface: {0}.".format(interface), level='debug')
+        log("Checking interface: {0}.".format(interface), level='DEBUG')
 
         # Key interest areas: u'interfaceCounters' and u'interfaceStatistics'
 
@@ -561,7 +549,7 @@ def is_delta_significant(device, counter, ref, cur):
     log("Comparing {0}[{1}]: REF [{2}], CUR [{3}]. "
         "expecting < {4}".format(device['name'], counter, ref, cur,
                                  device[counter.lower()]),
-        level='debug')
+        level='DEBUG')
     delta = cur - ref
     if delta >= int(device[counter.lower()]):
         return {'threshold': device[counter.lower()],
@@ -598,19 +586,10 @@ def send_trap(message, uptime='', test=False):
 
     """
 
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
-    if test:
-        args = ["snmptrap", "-v", "2c", "-c", "eosplus",
-                SNMP_SETTINGS['traphost'], "''",
-                ".1.3.6.1.4.1.30065", ".1.3.6.1.4.1.30065.6", "s",
-                "Host 10.10.10.12, interface Management 1: alignmentErrors" \
-                " increasing at > 1 per 5 seconds [3]"]
-        log("Sending SNMPTRAP to {0} with arguments: {1}".
-            format(SNMP_SETTINGS['traphost'], args))
-        call(args)
-        return 0
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
 
-    log("Sending SNMPTRAP to {0}: {1}".format(SNMP_SETTINGS['traphost'], message))
+    log("Sending SNMPTRAP to {0}: {1}".format(SNMP_SETTINGS['traphost'],
+                                              message))
 
     """ NOTE: snmptrap caveat: Generates an error when run as unprivileged user.
     Failed to create the persistent directory for /var/net-snmp/snmpapp.conf
@@ -657,91 +636,20 @@ def send_trap(message, uptime='', test=False):
     trap_args.append(enterprise_oid)
     trap_args.append(trap_oid)
     trap_args.append('s')
+
+    if test == "trap":
+        message = "Device 10.10.10.12, interface Management 1:" \
+            " FAKEalignmentErrors increasing at > 1 per 5 seconds [3]"
+        log("Sending SNMPTRAP to {0} with arguments: {1}".
+            format(SNMP_SETTINGS['traphost'], trap_args), level='DEBUG')
+
     trap_args.append(message)
 
-    if test:
+    if test == "trap":
         print "snmptrap_args:"
         pprint.pprint(trap_args)
 
     call(trap_args)
-
-class SyslogManager(object):
-
-    def __init__(self):
-        self.log = logging.getLogger(__name__)
-        #logging.basicConfig(level=logging.DEBUG)
-        global LOG_LEVEL
-        level = LOG_LEVEL
-        numeric_level = getattr(logging, level.upper(), None)
-        if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: %s' % level)
-        logging.basicConfig(level=numeric_level)
-        self.log.setLevel(logging.DEBUG)
-        self.formatter = logging.Formatter('ERRMON - %(levelname)s: '
-                                           '%(message)s')
-
-        # syslog to localhost enabled by default, if we are on EOS
-        if os.path.isfile('/mnt/flash/startup-config'):
-            self._add_syslog_handler()
-
-    #def setLevel(self, level):
-    #    # assuming level is bound to the string value obtained from the
-    #    # command line argument. Convert to upper case to allow the user to
-    #    # specify --log=DEBUG or --log=debug
-    #    numeric_level = getattr(logging, level.upper(), None)
-    #    if not isinstance(numeric_level, int):
-    #        raise ValueError('Invalid log level: %s' % level)
-    #    logging.basicConfig(level=numeric_level)
-    #    #handler.setLevel(level=logging.DEBUG)
-
-
-    def _add_handler(self, handler, level=None):
-        if level is None:
-            #level = 'DEBUG'
-            global LOG_LEVEL
-            level = LOG_LEVEL
-
-        try:
-            handler.setLevel(logging.getLevelName(level))
-        except ValueError:
-            log('SyslogManager: unknown logging level (%s) - using '
-                'log.DEFAULT instead' % level, error=True)
-            handler.setLevel(logging.DEBUG)
-
-        handler.setFormatter(self.formatter)
-        self.log.addHandler(handler)
-
-    def _add_syslog_handler(self):
-        log('SyslogManager: adding localhost handler')
-        self._add_handler(SysLogHandler(address=SYSLOG))
-
-    def _add_file_handler(self, filename, level=None):
-        log('SyslogManager: adding file handler (%s - level:%s)' %
-            (filename, level))
-        self._add_handler(logging.FileHandler(filename), level)
-
-    def _add_remote_syslog_handler(self, host, port, level=None):
-        log('SyslogManager: adding remote handler (%s:%s - level:%s)' %
-            (host, port, level))
-        self._add_handler(SysLogHandler(address=(host, port)), level)
-
-    def add_handlers(self, handler_config):
-        for entry in handler_config:
-            match = re.match('^file:(.+)',
-                             entry['destination'])
-            if match:
-                self._add_file_handler(match.groups()[ 0 ],
-                                       entry['level'])
-            else:
-                match = re.match('^(.+):(.+)',
-                                 entry['destination'])
-                if match:
-                    self._add_remote_syslog_handler(match.groups()[ 0 ],
-                                                    int(match.groups()[ 1 ]),
-                                                    entry['level'])
-                else:
-                    log('SyslogManager: Unable to create syslog handler for'
-                        ' %s' % str(entry), error=True)
 
 def main():
     ''' main execution routine for devops command. Parse the command
@@ -749,14 +657,11 @@ def main():
         and then process the response.
     '''
 
-    global SYSLOG_MANAGER
     global SNMP_SETTINGS
 
     args = parse_cmd_line()
-    SYSLOG_MANAGER = SyslogManager()
 
-
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
 
     config = read_config(args['config'])
 
@@ -769,8 +674,8 @@ def main():
         pprint.pprint(config)
         return 0
 
-    elif args['test'] == 'send':
-        send_trap('', test=True)
+    elif args['test'] == 'trap':
+        send_trap('', test='trap')
         return 0
 
     elif args['test'] == 'get':
@@ -784,7 +689,7 @@ def main():
         print "Test=get: --------------------------\n"
         return 0
 
-    log("Started up successfully", level='debug')
+    log("Started up successfully")
 
     reference = {}
 
@@ -796,7 +701,8 @@ def main():
 
     log("Entering main loop...")
     while True:
-        log("---sleeping for {0} seconds.".format(config['counters']['poll']))
+        log("---sleeping for {0} seconds.".format(config['counters']['poll']),
+            level='DEBUG')
         time.sleep(int(config['counters']['poll']))
 
         for device in config['switches']:
@@ -806,7 +712,6 @@ def main():
             get_device_status(device)
             changes = compare_counters(device, reference[device['hostname']],
                                        current, test=args['test'])
-
 
             send_traps(device, changes, int(config['counters']['poll']))
 
