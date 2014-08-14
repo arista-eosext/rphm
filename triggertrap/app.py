@@ -154,10 +154,10 @@ def remove_unneded_keys(keys, this_dict):
                 this_dict[section].pop(key, None)
 
 def read_config(filename):
-    """ Read the config file (Default: /mnt/persistent/triggertrap.conf)
+    """ Read the config file (Default: /persist/sys/triggertrap.conf)
 
     Read in settings from the config file.  The default:
-        /mnt/persistent/triggertrap.conf, is set in parse_cli().
+        /persist/sys/triggertrap.conf, is set in parse_cli().
 
     Args:
         filename (str): The path to the config file.
@@ -168,7 +168,7 @@ def read_config(filename):
     """
 
     if not filename:
-        filename = "/mnt/persistent/triggertrap.conf"
+        filename = "/persist/sys/triggertrap.conf"
 
     setting = {}
     defaults = {
