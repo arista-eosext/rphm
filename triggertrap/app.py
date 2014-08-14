@@ -181,7 +181,7 @@ def read_config(filename):
         'url': '%(protocol)s://%(username)s:%(password)s@%(hostname)s:%(port)s'\
                '/command-api',
         'interfaceList': 'Management 1',
-        'counterList': 'alignmentErrors',
+        'counterList': 'alignmentErrors,fcsErrors,symbolErrors',
         'traphost' : 'localhost',
         'version' : '2c',
         'community' : 'public',
@@ -262,16 +262,18 @@ def read_config(filename):
     # Convert switchList from a string to config sections with defaults
     #  then make sure a section exists for each one in the event that this
     #  is the only place this switch is included in the config.
+    #  Thsi has the added effect of picking up the defaults.
     if 'switchlist' in setting['switches']:
         for line in setting['switches']['switchlist'].split("\n"):
             for device in line.split(","):
                 device = device.strip('" \t')
                 if device:
+                    known_list = config.sections()
                     for section in config.sections():
-                        if device not in config.get(section, 'hostname'):
-                            if not config.has_section(device):
-                                config.add_section(device)
-
+                        known_list.append(config.get(section, 'hostname'))
+                    if device not in known_list:
+                        config.add_section(device)
+                        config.set(device, 'hostname', device)
 
     # Any section remaining, should being a switch definition
     setting['switches'] = []
