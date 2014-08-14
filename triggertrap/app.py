@@ -238,11 +238,23 @@ def read_config(filename):
         'txPause'
     )
 
+    os.path.isfile(filename)
+    if not os.access(filename, os.R_OK):
+        log("Unable to read config file {0}".format(filename))
+        raise IOError("Unable to read config file {0}".format(filename))
+
     config = ConfigParser.SafeConfigParser(defaults)
     config.read(filename)
 
     for section in ['switches', 'snmp', 'counters']:
-        options = config.options(section)
+        try:
+            options = config.options(section)
+        except ConfigParser.NoSectionError, err:
+            log("Required section missing from config file {0}: ({1})".
+                format(filename, err))
+            raise IOError(
+                "Required section missing from config file {0}: ({1})".
+                format(filename, err))
 
         setting[section] = {}
         for option in options:
@@ -599,6 +611,11 @@ def send_trap(message, uptime='', test=False):
         return 0
 
     log("Sending SNMPTRAP to {0}: {1}".format(SNMP_SETTINGS['traphost'], message))
+
+    """ NOTE: snmptrap caveat: Generates an error when run as unprivileged user.
+    Failed to create the persistent directory for /var/net-snmp/snmpapp.conf
+    http://sourceforge.net/p/net-snmp/bugs/1706/
+    """
 
     # Build the arguments to snmptrap
     trap_args = ['snmptrap']
