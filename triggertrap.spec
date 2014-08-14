@@ -26,6 +26,7 @@ Triggertrap Extension for EOS is an extension that monitors interface counters a
 %install
 rm -rf $RPM_BUILD_ROOT
 %{__python} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
+install -m755 -D triggertrap.conf $RPM_BUILD_ROOT/persist/sys/triggertrap.conf
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -34,3 +35,5 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,eosadmin,-)
 %{python_sitelib}/triggertrap*
 %{_bindir}/triggertrap
+/usr/triggertrap.conf
+/persist/sys/triggertrap.conf

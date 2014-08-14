@@ -62,6 +62,7 @@ setup(
       url='http://eos.aristanetworks.com',
       license='BSD-3',
       packages=find_modules('triggertrap'),
-      scripts=glob('bin/*')
+      scripts=glob('bin/*'),
+      data_files=['triggertrap.conf']
 )
 
