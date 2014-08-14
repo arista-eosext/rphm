@@ -285,14 +285,16 @@ def read_config(filename):
         switch['counters'] = []
         for line in switch['counterlist'].split("\n"):
             for item in line.split(","):
-                switch['counters'].append(item.strip('" \t'))
+                if item:
+                    switch['counters'].append(item.strip('" \t'))
         switch.pop('counterlist')
 
         # unmangle interfacelist from a string to a list
         switch['interfaces'] = []
         for line in switch['interfacelist'].split("\n"):
             for item in line.split(","):
-                switch['interfaces'].append(item.strip('" \t'))
+                if item:
+                    switch['interfaces'].append(item.strip('" \t'))
         switch.pop('interfacelist')
 
         setting['switches'].append(switch)
@@ -465,6 +467,7 @@ def compare_counters(device, reference, current, test=None):
 
         try:
             ref = reference[interface][u'interfaceCounters']
+            #ref = flatten(reference[interface][u'interfaceCounters'])
         except KeyError:
             log("Interface counters for [{0}] are not in reference dataset".
                 format(interface))
@@ -472,55 +475,63 @@ def compare_counters(device, reference, current, test=None):
 
         try:
             cur = current[interface][u'interfaceCounters']
+            #cur = flatten(current[interface][u'interfaceCounters'])
         except KeyError:
             log("Interface counters for [{0}] are not in current dataset".
                 format(interface))
             continue
 
         diffs[interface] = {}
-        for key in ref:
+        for counter in device['counters']:
+            ref_counter = [entry for entry in get_all(ref, counter)]
 
-            if key not in cur:
-                log("Key [{0}] in Reference not found in Current data set".
-                    format(key))
+            cur_counter = [entry for entry in get_all(cur, counter)]
+            if not ref_counter or not cur_counter:
+                log("Counter [{0}] missing from Reference or Current data" \
+                    " set. Skipping.".format(counter), error=True)
+                continue
 
-            if type(ref[key]) is dict:
-                for subkey in ref[key]:
-                    if subkey not in cur[key]:
-                        log("Key [{0}] in Reference not found in Current data"\
-                            " set".format(subkey))
-                    else:
-                        if subkey not in device['counters']:
-                            # This counter is in the list we're checking
-                            continue
-                        if test:
-                            from random import randrange
-                            cur[key][subkey] = ref[key][subkey] + randrange(10)
-                        tmp = is_delta_significant(device,
-                                                   subkey,
-                                                   ref[key][subkey],
-                                                   cur[key][subkey])
-                        if tmp is not None:
-                            diffs[interface][subkey] = tmp
-            else:
-                if key not in device['counters']:
-                    # This counter is in the list we're checking
-                    continue
-                if test:
-                    from random import randrange
-                    cur[key] = int(ref[key]) + randrange(10)
-                tmp = is_delta_significant(device,
-                                           key,
-                                           ref[key],
-                                           cur[key])
-                if tmp is not None:
-                    diffs[interface][key] = tmp
+            if test:
+                from random import randrange
+                val = int(ref_counter[0]) + randrange(10)
+                cur_counter[0] = int(ref_counter[0]) + val
+                log("TEST: incremented {0} by {1}".format(counter, val))
+
+            tmp = is_delta_significant(device,
+                                       counter,
+                                       ref_counter[0],
+                                       cur_counter[0])
+            if tmp is not None:
+                diffs[interface][counter] = tmp
 
         # Remove the interface entry if there were no results to report
         if not diffs[interface].keys():
             diffs.pop(interface)
 
     return diffs
+
+def get_all(data, key):
+    """Return all values of a key in a multi-level dictionary
+
+    Args:
+        data (dict): The dict in which to lookup a key
+        key (str): The key to find
+
+    Returns:
+        (itterable): A list of values for the specified key.
+
+    """
+
+    sub_iter = []
+    if isinstance(data, dict):
+        if key in data:
+            yield data[key]
+        sub_iter = data.itervalues()
+    if isinstance(data, list):
+        sub_iter = data
+    for subset in sub_iter:
+        for obj in get_all(subset, key):
+            yield obj
 
 def is_delta_significant(device, counter, ref, cur):
     """Verify whether the difference in a counter value, if any, between two
@@ -546,14 +557,21 @@ def is_delta_significant(device, counter, ref, cur):
 
     """
 
+    delta = cur - ref
+    try:
+        threshold = int(device[counter.lower()])
+    except KeyError:
+        log("No threshold set for {0} in the config file. Skipping.".
+            format(counter), error=True)
+        return None
+
     log("Comparing {0}[{1}]: REF [{2}], CUR [{3}]. "
         "expecting < {4}".format(device['name'], counter, ref, cur,
                                  device[counter.lower()]),
         level='DEBUG')
-    delta = cur - ref
-    if delta >= int(device[counter.lower()]):
-        return {'threshold': device[counter.lower()],
-                'found': delta}
+
+    if delta >= threshold:
+        return {'threshold': threshold, 'found': delta}
     else:
         return None
 
