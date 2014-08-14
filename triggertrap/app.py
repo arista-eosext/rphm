@@ -66,7 +66,7 @@ def log(msg, level='INFO', error=False):
         print "ERROR: {0} ({1}) {2}".format(os.path.basename(sys.argv[0]),
                                             level, msg)
 
-    priority = ''.join("syslog.LOG_", level)
+    priority = ''.join(["syslog.LOG_", level])
     syslog.syslog(eval(priority), msg)
 
 def parse_cmd_line():
@@ -613,6 +613,7 @@ def send_trap(message, uptime='', test=False):
     #
 
     # Build the arguments to snmptrap
+    #trap_args = ['snmptrap']
     trap_args = ['snmptrap']
     trap_args.append('-v')
     trap_args.append(SNMP_SETTINGS['version'])
@@ -622,20 +623,25 @@ def send_trap(message, uptime='', test=False):
         trap_args.append(SNMP_SETTINGS['community'])
 
     elif SNMP_SETTINGS['version'] == '3':
+        # Send v3 snmp-inform rathern than a trap
+        trap_args.append('-Ci')
+
+        trap_args.append('-l')
+        trap_args.append(SNMP_SETTINGS['seclevel'])
         trap_args.append('-u')
-        trap_args.append(SNMP_SETTINGS['username'])
+        trap_args.append(SNMP_SETTINGS['secname'])
 
-        if SNMP_SETTINGS['secLevel'] in ['authNoPriv', 'authPriv']:
+        if SNMP_SETTINGS['seclevel'] in ['authNoPriv', 'authPriv']:
             trap_args.append('-a')
-            trap_args.append(SNMP_SETTINGS['authProtocol'])
+            trap_args.append(SNMP_SETTINGS['authprotocol'])
             trap_args.append('-A')
-            trap_args.append(SNMP_SETTINGS['authPassword'])
+            trap_args.append(SNMP_SETTINGS['authpassword'])
 
-        if SNMP_SETTINGS['secLevel'] == 'authPriv':
+        if SNMP_SETTINGS['seclevel'] == 'authPriv':
             trap_args.append('-x')
-            trap_args.append(SNMP_SETTINGS['privProtocol'])
+            trap_args.append(SNMP_SETTINGS['privprotocol'])
             trap_args.append('-X')
-            trap_args.append(SNMP_SETTINGS['privPassword'])
+            trap_args.append(SNMP_SETTINGS['privpassword'])
     else:
         log("Unknown snmp version '{0}' specified in the config file.".
             format(SNMP_SETTINGS['version']))
