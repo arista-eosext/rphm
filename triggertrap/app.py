@@ -43,7 +43,6 @@ import time
 import os
 import sys
 import re
-import json
 
 from jsonrpclib import Server
 from subprocess import call
@@ -97,7 +96,7 @@ def parse_cmd_line():
                         default='/persist/sys/triggertrap.conf',
                         help='Specifies the configuration file to load' + \
                         '(Default: /persist/sys/triggertrap.conf)'
-                        )
+                       )
 
     parser.add_argument('--log',
                         action='store',
@@ -190,7 +189,8 @@ def read_config(filename):
         'port': '443',
         'username': 'arista',
         'password': 'arista',
-        'url': '%(protocol)s://%(username)s:%(password)s@%(hostname)s:%(port)s/command-api',
+        'url': '%(protocol)s://%(username)s:%(password)s@%(hostname)s:%(port)s'\
+               '/command-api',
         'interfaceList': 'Management 1',
         'counterList': 'alignmentErrors',
         'traphost' : 'localhost',
@@ -336,10 +336,30 @@ def get_interfaces(switch):
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
     response = switch.runCmds(1, ["show interfaces status"])
-    #print"Interface Status: "
-    #pprint.pprint(response[0])
+    """ Unable to connect raises
+        raise err
+        error: [Errno 60] Operation timed out
+    """
 
     return response[0][u'interfaceStatuses']
+
+def get_device_status(device):
+    """Get interface uptime and model information
+
+    Updates device Uptime and Model information in 'devices'
+
+    args:
+        device (dict): The device config dictionary
+
+    """
+
+    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
+    response = device['eapi_obj'].runCmds(1, ["show version"])
+    device['modelName'] = response[0]['modelName']
+    device['bootupTimestamp'] = response[0][u'bootupTimestamp']
+    #from time import asctime, localtime
+    #print "Uptime: {0}".
+    #format(asctime(localtime(response[0][u'bootupTimestamp'])))
 
 def get_intf_counters(switch, interface="Management 1"):
     """Get interface details for an interface
@@ -417,7 +437,8 @@ def get_device_counters(device):
     counters = {}
     for interface in device['interfaces']:
         get_interfaces(device['eapi_obj'])
-        counters[interface] = get_intf_counters(device['eapi_obj'], interface=interface)
+        counters[interface] = get_intf_counters(device['eapi_obj'],
+                                                interface=interface)
 
     return counters
 
@@ -445,31 +466,36 @@ def compare_counters(device, reference, current, test=None):
         try:
             ref = reference[interface][u'interfaceCounters']
         except KeyError:
-            log("Interface counters for [{0}] are not in reference dataset".format(interface))
+            log("Interface counters for [{0}] are not in reference dataset".
+                format(interface))
             continue
 
         try:
             cur = current[interface][u'interfaceCounters']
         except KeyError:
-            log("Interface counters for [{0}] are not in current dataset".format(interface))
+            log("Interface counters for [{0}] are not in current dataset".
+                format(interface))
             continue
 
         diffs[interface] = {}
         for key in ref:
 
             if key not in cur:
-                log("Key [{0}] in Reference not found in Current data set".format(key))
+                log("Key [{0}] in Reference not found in Current data set".
+                    format(key))
 
             if type(ref[key]) is dict:
                 for subkey in ref[key]:
                     if subkey not in cur[key]:
-                        log("Key [{0}] in Reference not found in Current data set".format(subkey))
+                        log("Key [{0}] in Reference not found in Current data"\
+                            " set".format(subkey))
                     else:
                         if subkey not in device['counters']:
                             # This counter is in the list we're checking
                             continue
                         if test:
-                            cur[key][subkey] += 3
+                            from random import randrange
+                            cur[key][subkey] = ref[key][subkey] + randrange(10)
                         tmp = is_delta_significant(device,
                                                    subkey,
                                                    ref[key][subkey],
@@ -481,7 +507,8 @@ def compare_counters(device, reference, current, test=None):
                     # This counter is in the list we're checking
                     continue
                 if test:
-                    cur[key] += 3
+                    from random import randrange
+                    cur[key] = int(ref[key]) + randrange(10)
                 tmp = is_delta_significant(device,
                                            key,
                                            ref[key],
@@ -536,36 +563,90 @@ def send_traps(device, changes, interval):
 
     for interface in changes:
         for counter in changes[interface]:
-            send_trap(device, interface, counter, changes[interface], interval)
+            trap_content = "Device {0} {1}, interface {2}: {3}"\
+                " increasing at > {4} per {5} seconds. Found [{6}]".\
+            format(device['hostname'],
+                   device['modelName'],
+                   interface,
+                   counter,
+                   changes[interface][counter]['threshold'],
+                   interval,
+                   changes[interface][counter]['found'])
 
-def send_trap(device, interface, counter, changes, interval, test=False):
-    """ Send an SNMP trap
+            # TODO system uptime
+            send_trap(trap_content, uptime=device['bootupTimestamp'])
+
+def send_trap(message, uptime='', test=False):
+    """ Send an Arista enterprise-specific SNMP trap containing message.
+
+    Args:
+        message (string): The message to include in the trap
+        uptime (string): The device's uptime for the SNMP trap.
+        test (bool): Sent a sample trap message? (Default: False)
 
     """
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='debug')
     if test:
-        call(["snmptrap", "-v", "2c", "-c", "eosplus", "localhost", "''",
-              "NOTIFICATION-TEST-MIB::demo-notif", "SNMPv2-MIB::sysLocation.0",
-              "s", "just here - v2"])
+        args = ["snmptrap", "-v", "2c", "-c", "eosplus",
+                SNMP_SETTINGS['traphost'], "''",
+                ".1.3.6.1.4.1.30065", ".1.3.6.1.4.1.30065.6", "s",
+                "Host 10.10.10.12, interface Management 1: alignmentErrors" \
+                " increasing at > 1 per 5 seconds [3]"]
+        log("Sending SNMPTRAP to {0} with arguments: {1}".
+            format(SNMP_SETTINGS['traphost'], args))
+        call(args)
+        return 0
 
-    trap_content = "Host {0}, interface {1}: {2} increasing at > {3}/{4}sec [{5}]"\
-    .format(device['hostname'],
-            interface,
-            counter,
-            changes[counter]['threshold'],
-            interval,
-            changes[counter]['found'])
-    print "TRAP: %s" % trap_content
+    log("Sending SNMPTRAP to {0}: {1}".format(SNMP_SETTINGS['traphost'], message))
 
-    enterprise_oid = '1.3.6.1.4.1.30065'
-    generic_trapnum = 6
-    specific_trapnum = 1
-    trap_oid = '1.3.6.1.4.1.30065.0.1'
-    print "Trapinfo: {0} {1} {2} {3}".format(enterprise_oid,
-                                             generic_trapnum,
-                                             specific_trapnum,
-                                             trap_oid)
+    # Build the arguments to snmptrap
+    trap_args = ['snmptrap']
+    trap_args.append('-v')
+    trap_args.append(SNMP_SETTINGS['version'])
+
+    if SNMP_SETTINGS['version'] == '2c':
+        trap_args.append('-c')
+        trap_args.append(SNMP_SETTINGS['community'])
+
+    elif SNMP_SETTINGS['version'] == '3':
+        trap_args.append('-u')
+        trap_args.append(SNMP_SETTINGS['username'])
+
+        if SNMP_SETTINGS['secLevel'] in ['authNoPriv', 'authPriv']:
+            trap_args.append('-a')
+            trap_args.append(SNMP_SETTINGS['authProtocol'])
+            trap_args.append('-A')
+            trap_args.append(SNMP_SETTINGS['authPassword'])
+
+        if SNMP_SETTINGS['secLevel'] == 'authPriv':
+            trap_args.append('-x')
+            trap_args.append(SNMP_SETTINGS['privProtocol'])
+            trap_args.append('-X')
+            trap_args.append(SNMP_SETTINGS['privPassword'])
+    else:
+        log("Unknown snmp version '{0}' specified in the config file.".
+            format(SNMP_SETTINGS['version']))
+    trap_args.append(SNMP_SETTINGS['traphost'])
+
+    #.iso.org.dod.internet.private. .arista
+    # enterprises.30065
+    enterprise_oid = '.1.3.6.1.4.1.30065'
+    # enterpriseSpecific = 6
+    generic_trapnum = '6'
+    trap_oid = '.'.join([enterprise_oid, generic_trapnum])
+
+    trap_args.append("'"+str(uptime)+"'")
+    trap_args.append(enterprise_oid)
+    trap_args.append(trap_oid)
+    trap_args.append('s')
+    trap_args.append(message)
+
+    if test:
+        print "snmptrap_args:"
+        pprint.pprint(trap_args)
+
+    call(trap_args)
 
 class SyslogManager(object):
 
@@ -672,13 +753,13 @@ def main():
         return 0
 
     elif args['test'] == 'send':
-        send_trap(test=True)
+        send_trap('', test=True)
         return 0
 
     elif args['test'] == 'get':
         #logger.debug("Connecting to {config['switches'][0]['url']}")
         #logger.debug("Connecting to {0}".format(config['switches'][0]['url']))
-        print"Connecting to {0}".format(config['switches'][0]['url'])
+        print "Connecting to {0}".format(config['switches'][0]['url'])
         switch = Server(config['switches'][0]['url'])
         counters = get_intf_counters(switch, interface="Management 1")
         print "\nTest=get: received the following counters from Management 1:"
@@ -692,15 +773,11 @@ def main():
 
     log("Getting baseline counters from each device.")
     for device in config['switches']:
-        log("Connecting to {config['switches'][0]['url']}")
+        log("Connecting to {0}".format(device['url']))
         device['eapi_obj'] = Server(device['url'])
         reference[device['hostname']] = get_device_counters(device)
 
-    # TODO: temporary for debugging
-    with open('tmp_reference.json', 'w') as outfile:
-        json.dump(reference, outfile)
-
-    log("Entering main loop.")
+    log("Entering main loop...")
     while True:
         log("---sleeping for {0} seconds.".format(config['counters']['poll']))
         time.sleep(int(config['counters']['poll']))
@@ -709,13 +786,14 @@ def main():
             log("Polling {0}".format(device['name']))
             current = {}
             current = get_device_counters(device)
-            changes = compare_counters(device, reference[device['hostname']], current, test=args['test'])
+            get_device_status(device)
+            changes = compare_counters(device, reference[device['hostname']],
+                                       current, test=args['test'])
 
 
             send_traps(device, changes, int(config['counters']['poll']))
 
-            # Copy current stats-->reference
-
-        # Just once through for initial testing
-        break
+            # Copy current stats-->reference to reset the "deltas" for the
+            #   next run.
+            reference[device['hostname']] = dict(current)
 
