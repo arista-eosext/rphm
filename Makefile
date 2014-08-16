@@ -61,7 +61,8 @@ install:
 	$(PYTHON) setup.py install
 
 sdist: clean
-	$(PYTHON) setup.py sdist -t MANIFEST.in
+	$(PYTHON) setup.py sdist
+	#$(PYTHON) setup.py sdist -t MANIFEST.in
 
 rpmcommon: sdist
 	@mkdir -p rpmbuild

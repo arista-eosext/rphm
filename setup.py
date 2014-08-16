@@ -41,7 +41,8 @@
 import os
 
 from glob import glob
-from distutils.core import setup
+#from distutils.core import setup
+from setuptools import setup, find_packages
 
 from triggertrap import __version__, __author__
 
@@ -53,16 +54,33 @@ def find_modules(pkg):
             modules.append(os.path.join(dirname, subdirname))
     return modules
 
+INSTALL_ROOT = os.getenv('VIRTUAL_ENV', '')
+CONF_PATH = INSTALL_ROOT + '/persist/sys'
+#INSTALL_REQUIREMENTS = open('requirements.txt').read().split('\n')
+INSTALL_REQUIREMENTS = [
+    'jsonrpclib'
+    ]
+
+TEST_REQUIREMENTS = [
+    'mock'
+    ]
+
+
 setup(
       name='triggertrap',
       version=__version__,
       description='EOS extension to generate SNMP traps based on counter thresholds',
+      long_description=open('README.md').read(),
       author=__author__,
-      author_email='eosplus@aristanetworks.com',
+      author_email='eosplus-dev@aristanetworks.com',
       url='http://eos.aristanetworks.com',
       license='BSD-3',
+      install_requires=INSTALL_REQUIREMENTS,
+      tests_require=TEST_REQUIREMENTS,
       packages=find_modules('triggertrap'),
       scripts=glob('bin/*'),
-      data_files=['triggertrap.conf']
+      data_files=[
+          (CONF_PATH, ['conf/triggertrap.conf'])
+      ]
 )
 
