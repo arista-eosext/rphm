@@ -40,12 +40,12 @@ import time
 import os
 import sys
 import syslog
-import pprint
+from pprint import pprint
 from jsonrpclib import Server
+from jsonrpclib import ProtocolError
 from subprocess import call
 
 SNMP_SETTINGS = None   #pylint: disable=C0103
-DEBUG = False   #pylint: disable=C0103
 
 def log(msg, level='INFO', error=False):
     """Logging facility setup.
@@ -58,8 +58,7 @@ def log(msg, level='INFO', error=False):
 
     """
 
-    if DEBUG:
-        print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
+    print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
 
     if error:
         level = "ERR"
@@ -109,19 +108,6 @@ def parse_cmd_line():
                         help=argparse.SUPPRESS)
 
     args = parser.parse_args()
-
-    global DEBUG
-    DEBUG = args.debug
-
-    #global LOG_LEVEL
-    # assuming level is bound to the string value obtained from the
-    # command line argument. Convert to upper case to allow the user to
-    # specify --log=DEBUG or --log=debug
-    #numeric_level = getattr(logging, args.log.upper(), None)
-    #if not isinstance(numeric_level, int):
-    #    raise ValueError('Invalid log level: %s' % args.log)
-    #LOG_LEVEL = args.log.upper()
-    #logging.basicConfig(level=numeric_level)
 
     return vars(args)
 
@@ -425,9 +411,55 @@ def get_intf_counters(switch, interface="Management 1"):
 
     """
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
-    response = switch.runCmds(1, ["show interfaces {0}".format(interface)])
-    #pprint.pprint(response[0])
-    return response[0][u'interfaces'][interface.replace(" ", "")]
+    commands = ["show interfaces {0}".format(interface)]
+
+    try:
+        response = switch.runCmds(1, commands)
+    except ProtocolError, err:
+        (errno, msg) = err[0]
+        # 1002: invalid command
+        if errno == 1002:
+            log("Invalid EOS interface name ({0})".format(commands), error=True)
+        else:
+            log("ProtocolError while retrieving {0} ([{1}] {2})".
+                format(commands, errno, msg),
+                error=True)
+    except Exception, err:
+        #   60: Operation timed out
+        #   61: Connection refused (http vs https?)
+        #  401: Unauthorized
+        #  405: Method Not Allowed (bad URL)
+        if hasattr(err, 'errno'):
+            if err.errno == 60:
+                log("Connection timed out: Incorrect hostname/IP or eAPI"
+                    " not configured on the switch.", error=True)
+            elif err.errno == 61:
+                log("Connection refused: http instead of https selected or"
+                    " eAPI not configured on the switch.", error=True)
+            else:
+                log("General Error retrieving {0} ({1})".format(commands,
+                                                                err),
+                    error=True)
+        else:
+            # Parse the string manually
+            msg = str(err)
+            msg = msg.strip('<>')
+            err = msg.split(': ')[-1]
+
+            if "401 Unauthorized" in err:
+                log("ERROR: Bad username or password")
+            elif "405 Method" in err:
+                log("ERROR: Incorrect URL")
+            else:
+                log("HTTP Error retrieving {0} ({1})".format(commands,
+                                                             err),
+                    error=True)
+
+    if isinstance(response, list):
+        #pprint(response[0])
+        return response[0][u'interfaces'][interface.replace(" ", "")]
+    else:
+        return None
 
 def get_device_counters(device):
     """ Get counters from a device and return a dict of results
@@ -671,7 +703,7 @@ def send_trap(message, uptime='', test=False):
 
     if test == "trap":
         print "snmptrap_args:"
-        pprint.pprint(trap_args)
+        pprint(trap_args)
 
     call(trap_args)
 
@@ -693,9 +725,9 @@ def main():
 
     if args['test'] == 'parse_only':
         print "\nargs:"
-        pprint.pprint(args)
+        pprint(args)
         print "\nconfig:"
-        pprint.pprint(config)
+        pprint(config)
         return 0
 
     elif args['test'] == 'trap':
@@ -707,7 +739,7 @@ def main():
         switch = Server(config['switches'][0]['url'])
         counters = get_intf_counters(switch, interface="Management 1")
         print "\nTest=get: received the following counters from Management 1:"
-        pprint.pprint(counters)
+        pprint(counters)
         print "Test=get: --------------------------\n"
         return 0
 
