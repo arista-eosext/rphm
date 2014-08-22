@@ -336,7 +336,8 @@ def get_interfaces(switch):
 def get_device_status(device):
     """Get interface uptime and model information
 
-    Updates device Uptime and Model information in 'devices'
+    Updates device Uptime and Model information in 'devices'.  This
+    gets run on every pass in case the device uptime has changed.
 
     args:
         device (dict): The device config dictionary
@@ -348,6 +349,12 @@ def get_device_status(device):
     device['modelName'] = response[0]['modelName']
     device['bootupTimestamp'] = response[0][u'bootupTimestamp']
 
+    if device['name'] == "localhost":
+        hostname = device['eapi_obj'].runCmds(1, ["show hostname"])
+        print "Hostname:"
+        pprint(hostname)
+        device['name'] = hostname[0]['hostname']
+
 def get_intf_counters(switch, interface="Management 1"):
     """Get interface details for an interface
 
@@ -358,7 +365,8 @@ def get_intf_counters(switch, interface="Management 1"):
         interface (str): A complete interface name to lookup.
 
     returns:
-        dict: Dictionary, of detailed interface information/stats.
+        dict: Dictionary, of detailed interface information/stats
+              or None if the interface name is invalid.
 
     example:
         {u'autoNegotiate': u'success',
@@ -412,6 +420,8 @@ def get_intf_counters(switch, interface="Management 1"):
     """
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     commands = ["show interfaces {0}".format(interface)]
+
+    response = None
 
     try:
         response = switch.runCmds(1, commands)
@@ -472,6 +482,8 @@ def get_device_counters(device):
         get_interfaces(device['eapi_obj'])
         counters[interface] = get_intf_counters(device['eapi_obj'],
                                                 interface=interface)
+        if counters[interface] is None:
+            counters.pop(interface)
 
     return counters
 
@@ -610,11 +622,20 @@ def send_traps(device, changes, interval):
     """ Send SNMP traps for each delta noted in "changes"
     """
 
+    # 'localhost' isn't very meaningful at a central traphost so
+    # try do present something more meaningful.  device['name']
+    # will either be user-specified in the config or, if localhost,
+    # we will fill that in with the hostname configured on the switch.
+    if device['hostname'] == "localhost":
+        hostname = device['name']
+    else:
+        hostname = device['hostname']
+
     for interface in changes:
         for counter in changes[interface]:
             trap_content = "Device {0} {1}, interface {2}: {3}"\
                 " increasing at > {4} per {5} seconds. Found [{6}]".\
-            format(device['hostname'],
+            format(hostname,
                    device['modelName'],
                    interface,
                    counter,
@@ -694,7 +715,7 @@ def send_trap(message, uptime='', test=False):
     trap_args.append('s')
 
     if test == "trap":
-        message = "Device 10.10.10.12, interface Management 1:" \
+        message = "Device TEST-Device, interface Management 1:" \
             " FAKEalignmentErrors increasing at > 1 per 5 seconds [3]"
         log("Sending SNMPTRAP to {0} with arguments: {1}".
             format(SNMP_SETTINGS['traphost'], trap_args), level='DEBUG')
