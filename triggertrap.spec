@@ -2,7 +2,7 @@
 
 # XXX Need to add runtime dependencies
 Name: triggertrap
-Version: 0.1.0
+Version: 0.1.1
 Release: 1%{?dist}
 Summary: TriggerTrap Extension for Arista EOS
 
