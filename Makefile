@@ -10,6 +10,7 @@
 #   make rpm  ------ produce RPMs
 #   make sdist ----- builds a source distribution
 #   make tests ----- run the tests
+#   make coverage -- run the tests and analyze code coverage
 #
 ########################################################
 # variable section
@@ -53,6 +54,16 @@ clean:
 
 tests: clean
 	$(PYTHON) -m unittest discover ./test -v
+
+coverage: clean
+	nosetests --verbosity=3 -x --with-xunit --xunit-file=junit-report.xml  --with-coverage --cover-erase --cover-html --cover-package=triggertrap --cover-branches
+
+report:
+	coverage report -m
+
+coverageclean:
+	rm -rf cover
+	rm .coverage
 
 python:
 	$(PYTHON) setup.py build
