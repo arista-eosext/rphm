@@ -464,7 +464,7 @@ class GetDataTests(unittest.TestCase):
         response[0][u'interfaces'] = self.reference
 
         switch.runCmds = MagicMock(return_value=response)
-        counters = app.get_intf_counters(switch)
+        (propername, counters) = app.get_intf_counters(switch)
         self.assertDictEqual(counters, self.reference['Management1'])
 
 if __name__ == '__main__':

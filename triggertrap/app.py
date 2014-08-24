@@ -355,7 +355,7 @@ def get_device_status(device):
         pprint(hostname)
         device['name'] = hostname[0]['hostname']
 
-def get_intf_counters(switch, interface="Management 1"):
+def get_intf_counters(switch, interface="Management1"):
     """Get interface details for an interface
 
     Get detailed information on the specified interface.
@@ -365,8 +365,9 @@ def get_intf_counters(switch, interface="Management 1"):
         interface (str): A complete interface name to lookup.
 
     returns:
-        dict: Dictionary, of detailed interface information/stats
-              or None if the interface name is invalid.
+        tuple: Normalized interface name and a dictionary, of detailed
+             interface information/stats or None if the interface name
+             is invalid.
 
     example:
         {u'autoNegotiate': u'success',
@@ -418,7 +419,8 @@ def get_intf_counters(switch, interface="Management 1"):
          u'physicalAddress': u'08:00:27:72:f6:77'}}}
 
     """
-    log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
+    log("Entering {0}: {1}.".format(sys._getframe().f_code.co_name,
+                                    interface), level='DEBUG')
     commands = ["show interfaces {0}".format(interface)]
 
     response = None
@@ -467,9 +469,13 @@ def get_intf_counters(switch, interface="Management 1"):
 
     if isinstance(response, list):
         #pprint(response[0])
-        return response[0][u'interfaces'][interface.replace(" ", "")]
+
+        # Normalize the interface name.  This ensures that, internally, we
+        #   use "formal" names for the interfaces as returned in JSON.
+        interface = response[0][u'interfaces'].keys()[0]
+        return (interface, response[0][u'interfaces'][interface])
     else:
-        return None
+        return (interface, None)
 
 def get_device_counters(device):
     """ Get counters from a device and return a dict of results
@@ -478,17 +484,22 @@ def get_device_counters(device):
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
 
     counters = {}
-    for interface in device['interfaces']:
-        get_interfaces(device['eapi_obj'])
-        counters[interface] = get_intf_counters(device['eapi_obj'],
+    for index, interface in enumerate(device['interfaces']):
+        #get_interfaces(device['eapi_obj'])
+        #interface = interface.replace(" ", "")
+        (propername, counters[interface]) = get_intf_counters(device['eapi_obj'],
                                                 interface=interface)
         if counters[interface] is None:
             counters.pop(interface)
+        if interface != propername:
+            device['interfaces'][index] = propername
 
     return counters
 
 def compare_counters(device, reference, current, test=None):
     """Compare the counters in 2 sets and return only differences
+
+    Any interface not in up/up state will be skipped.
 
     Args:
         device (dict): A device config from the config_file
@@ -521,6 +532,12 @@ def compare_counters(device, reference, current, test=None):
             #cur = flatten(current[interface][u'interfaceCounters'])
         except KeyError:
             log("Interface counters for [{0}] are not in current dataset".
+                format(interface))
+            continue
+
+        # Skip interfaces not in Up state.
+        if current[interface][u'lineProtocolStatus'] != u'up':
+            log("Interface [{0}] is not up. Skipping...".
                 format(interface))
             continue
 
@@ -758,7 +775,7 @@ def main():
     elif args['test'] == 'get':
         print "Connecting to eAPI at {0}".format(config['switches'][0]['url'])
         switch = Server(config['switches'][0]['url'])
-        counters = get_intf_counters(switch, interface="Management 1")
+        (interface, counters) = get_intf_counters(switch, interface="Management1")
         print "\nTest=get: received the following counters from Management 1:"
         pprint(counters)
         print "Test=get: --------------------------\n"
