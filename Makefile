@@ -56,7 +56,10 @@ tests: clean
 	$(PYTHON) -m unittest discover ./test -v
 
 coverage: clean
-	nosetests --verbosity=3 -x --with-xunit --xunit-file=junit-report.xml  --with-coverage --cover-erase --cover-html --cover-package=triggertrap --cover-branches
+	PYTHONPATH=. nosetests --verbosity=3 -x --with-xunit \
+			   --xunit-file=junit-report.xml  \
+			   --with-coverage --cover-erase --cover-html \
+			   --cover-package=triggertrap --cover-branches
 
 report:
 	coverage report -m

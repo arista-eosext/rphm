@@ -485,8 +485,6 @@ def get_device_counters(device):
 
     counters = {}
     for index, interface in enumerate(device['interfaces']):
-        #get_interfaces(device['eapi_obj'])
-        #interface = interface.replace(" ", "")
         (propername, counters[interface]) = get_intf_counters(device['eapi_obj'],
                                                 interface=interface)
         if counters[interface] is None:
@@ -517,11 +515,8 @@ def compare_counters(device, reference, current, test=None):
     for interface in reference:
         log("Checking interface: {0}.".format(interface), level='DEBUG')
 
-        # Key interest areas: u'interfaceCounters' and u'interfaceStatistics'
-
         try:
             ref = reference[interface][u'interfaceCounters']
-            #ref = flatten(reference[interface][u'interfaceCounters'])
         except KeyError:
             log("Interface counters for [{0}] are not in reference dataset".
                 format(interface))
@@ -529,7 +524,6 @@ def compare_counters(device, reference, current, test=None):
 
         try:
             cur = current[interface][u'interfaceCounters']
-            #cur = flatten(current[interface][u'interfaceCounters'])
         except KeyError:
             log("Interface counters for [{0}] are not in current dataset".
                 format(interface))
