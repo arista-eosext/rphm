@@ -512,6 +512,31 @@ def compare_counters(device, reference, current, test=None):
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     diffs = {}
+
+    inputCounters = ['alignmentErrors',
+                     'fcsErrors',
+                     'giantFrames',
+                     'runtFrames',
+                     'rxPause',
+                     'symbolErrors',
+                     'inBroadcastPkts',
+                     'inDiscards',
+                     'inMulticastPkts',
+                     'inOctets',
+                     'inUcastPkts',
+                     'totalInErrors']
+    outputCounters = ['collisions',
+                      'deferredTransmissions',
+                      'lateCollisions',
+                      'txPause',
+                      'outBroadcastPkts',
+                      'outDiscards',
+                      'outMulticastPkts',
+                      'outOctets',
+                      'outUcastPkts',
+                      'totalOutErrors']
+    # linkStatusChanges don't fall in to either category, exactly.
+
     for interface in reference:
         log("Checking interface: {0}.".format(interface), level='DEBUG')
 
@@ -536,6 +561,14 @@ def compare_counters(device, reference, current, test=None):
             continue
 
         diffs[interface] = {}
+        totalIn = list(get_all(ref, 'inUcastPkts'))[0] + \
+            list(get_all(ref, 'inMulticastPkts'))[0] + \
+            list(get_all(ref, 'inBroadcastPkts'))[0]
+
+        totalOut = list(get_all(ref, 'outUcastPkts'))[0] + \
+            list(get_all(ref, 'outMulticastPkts'))[0] + \
+            list(get_all(ref, 'outBroadcastPkts'))[0]
+
         for counter in device['counters']:
             ref_counter = list(get_all(ref, counter))
             cur_counter = list(get_all(cur, counter))
@@ -544,6 +577,19 @@ def compare_counters(device, reference, current, test=None):
                 log("Counter [{0}] missing from Reference or Current data" \
                     " set. Skipping.".format(counter), error=True)
                 continue
+
+            #Check counter direction
+            if counter in inputCounters:
+                direction = "in"
+                total = totalIn
+            if counter in outputCounters:
+                direction = "out"
+                total = totalOut
+            else:
+                #direction = "NA"
+                # linkStatusChanges don't fall in to either category, exactly.
+                direction = "in"
+                total = totalIn
 
             if test:
                 from random import randrange
@@ -554,7 +600,9 @@ def compare_counters(device, reference, current, test=None):
             tmp = is_delta_significant(device,
                                        counter,
                                        ref_counter[0],
-                                       cur_counter[0])
+                                       cur_counter[0],
+                                       total,
+                                       direction)
             if tmp is not None:
                 diffs[interface][counter] = tmp
 
@@ -587,7 +635,7 @@ def get_all(data, key):
         for obj in get_all(subset, key):
             yield obj
 
-def is_delta_significant(device, counter, ref, cur):
+def is_delta_significant(device, counter, ref, cur, total=0, direction="in"):
     """Verify whether the difference in a counter value, if any, between two
     checks is equal to or greater than the set rate threshold for that counter.
 
@@ -625,7 +673,7 @@ def is_delta_significant(device, counter, ref, cur):
         level='DEBUG')
 
     if delta >= threshold:
-        return {'threshold': threshold, 'found': delta}
+        return {'threshold': threshold, 'found': delta, 'total': total, 'direction': direction}
     else:
         return None
 
@@ -644,15 +692,18 @@ def send_traps(device, changes, interval):
 
     for interface in changes:
         for counter in changes[interface]:
+
             trap_content = "Device {0} {1}, interface {2}: {3}"\
-                " increasing at > {4} per {5} seconds. Found [{6}]".\
+                " increasing at > {4} per {5} seconds. Found {6}/{7} packets {8}".\
             format(hostname,
                    device['modelName'],
                    interface,
                    counter,
                    changes[interface][counter]['threshold'],
                    interval,
-                   changes[interface][counter]['found'])
+                   changes[interface][counter]['found'],
+                   changes[interface][counter]['total'],
+                   changes[interface][counter]['direction'])
 
             # system uptime
             send_trap(trap_content, uptime=device['bootupTimestamp'])
@@ -727,7 +778,7 @@ def send_trap(message, uptime='', test=False):
 
     if test == "trap":
         message = "Device TEST-Device, interface Management 1:" \
-            " FAKEalignmentErrors increasing at > 1 per 5 seconds [3]"
+            " FAKEalignmentErrors increasing at > 1 per 5 seconds. Found 7/2401 packets in"
         log("Sending SNMPTRAP to {0} with arguments: {1}".
             format(SNMP_SETTINGS['traphost'], trap_args), level='DEBUG')
 

@@ -170,6 +170,11 @@ class StatMonTests(unittest.TestCase):
 
         self.equal_result = {}
 
+    def test_log_error(self):
+        app.log("test message", error=True)
+        # TODO Need to actually validate STDOUT and the syslog level
+
+
     def test_remove_unneded_keys(self):
         input_dict = {'section 1': {'a': 0,
                                     'b': 1,
@@ -220,7 +225,7 @@ class StatMonTests(unittest.TestCase):
 
         # Call the routine
         result = app.compare_counters(device, self.reference, current)
-        self.assertEqual(result, {'Management 1': {counter: {'found': val, 'threshold': int(thresh)}}})
+        self.assertEqual(result, {'Management 1': {counter: {'found': val, 'threshold': int(thresh), 'direction': 'in', 'total': 0}}})
 
     def test_is_delta_significant_equal(self):
         device = dict(self.device)
@@ -281,7 +286,7 @@ class StatMonTests(unittest.TestCase):
 
         # Call the routine
         result = app.is_delta_significant(device, counter, ref, cur)
-        self.assertEqual(result, {'found': val, 'threshold': int(thresh)})
+        self.assertEqual(result, {'found': val, 'threshold': int(thresh), 'direction': 'in', 'total': 0})
 
 
 
@@ -466,6 +471,26 @@ class GetDataTests(unittest.TestCase):
         switch.runCmds = MagicMock(return_value=response)
         (propername, counters) = app.get_intf_counters(switch)
         self.assertDictEqual(counters, self.reference['Management1'])
+
+    #def test_get_device_counters_good(self):
+    #    device = dict(self.device)
+    #    from mock import MagicMock
+    #    #from jsonrpclib import Server
+    #    #device['eapi_obj'] = Server('https://arista:arista@10.10.10.11:443/command-api')
+    #    #response = []
+    #    #response.append({})
+    #    #response[0][u'interfaces'] = self.reference
+
+    #    #device['eapi_obj'].runCmds = MagicMock(return_value=response)
+
+    #    response = dict(self.reference)
+    #    app.get_intf_counters = MagicMock(return_value=('Management1', response)
+
+    #    #(propername, counters) = app.get_intf_counters(switch)
+    #    #self.assertDictEqual(counters, self.reference['Management1'])
+    #    counters = app.get_device_counters(device)
+    #    expected_counters = {}
+    #    self.assertEqual(counters, expected_counters)
 
 if __name__ == '__main__':
     unittest.main()
