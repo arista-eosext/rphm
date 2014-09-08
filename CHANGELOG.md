@@ -1,3 +1,7 @@
+# 1.0.0 (September 2014)
+
+* Initial public release
+
 # 0.1.2 (September 2014)
 
 * Add total packets during a period to the SNMP message
