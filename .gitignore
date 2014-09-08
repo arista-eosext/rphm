@@ -21,6 +21,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+__pycache__
+rpmbuild
 
 # Installer logs
 pip-log.txt
@@ -33,6 +35,16 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+junit-report.xml
+cover/
 
 # Translations
 *.mo
@@ -52,3 +64,13 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# OSX crud
+.DS_STORE
+
+# Sphinx crud
+_build
+_static
+_templates
+
+# local environment
+.env
