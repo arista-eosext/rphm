@@ -58,7 +58,8 @@ def log(msg, level='INFO', error=False):
 
     """
 
-    print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
+    if DEBUG:
+        print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
 
     if error:
         level = "ERR"
@@ -810,8 +811,10 @@ def main():
     '''
 
     global SNMP_SETTINGS
+    global DEBUG
 
     args = parse_cmd_line()
+    DEBUG = args['debug']
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
 
