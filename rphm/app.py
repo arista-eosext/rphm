@@ -677,8 +677,21 @@ def is_delta_significant(device, counter, ref, cur, total=0, direction="in"):
     else:
         return None
 
-def send_traps(device, changes, interval):
-    """ Send SNMP traps for each delta noted in "changes"
+def do_actions(device, changes, interval):
+    """ Perform actions for each delta noted in "changes"
+
+    Actions currently consist of send_trap() to send an SNMP-trap.  Future
+    possibilities could include sending an email, additional syslogs, or
+    taking action on-device, such as shutting down an LAG member with
+    undesirable performance characteristics.
+
+    Args:
+        device (string): The friendly-name/hostname of the node.
+        changes (dict): A dictionary by port consisting of the counter that
+        changed, the amount it changed, the threshold it crossed, and the
+        total traffic on the interface during that same interval.
+        interval (int): The interval in seconds between port health checks
+
     """
 
     # 'localhost' isn't very meaningful at a central traphost so
@@ -850,7 +863,7 @@ def main():
             changes = compare_counters(device, reference[device['hostname']],
                                        current, test=args['test'])
 
-            send_traps(device, changes, int(config['counters']['poll']))
+            do_actions(device, changes, int(config['counters']['poll']))
 
             # Copy current stats-->reference to reset the "deltas" for the
             #   next run.
