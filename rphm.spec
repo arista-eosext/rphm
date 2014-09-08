@@ -2,7 +2,7 @@
 
 # XXX Need to add runtime dependencies
 Name: rphm
-Version: 0.1.2
+Version: 1.0.0
 Release: 1%{?dist}
 Summary: Remote Port Health Manager (rphm) Extension for Arista EOS
 
