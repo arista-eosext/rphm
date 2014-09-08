@@ -33,5 +33,5 @@
 ''' Triggertrap is an extension for EOS which will monitor interfaces for
     certain counters and generate SNMP traps when thresholds are exceeded.
 '''
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __author__ = 'Arista Networks'
