@@ -1,8 +1,3 @@
-rphm
-====
-
-Remote Port Health Monitory
-=======
 # Remote Port Health Manager (rphm) extension for Arista EOS
 
 ## Overview
