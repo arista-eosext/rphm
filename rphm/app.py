@@ -31,7 +31,7 @@
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-"""Main module for the triggertrap shell command.
+"""Main module for the rphm shell command.
 """
 
 import argparse
@@ -85,9 +85,9 @@ def parse_cmd_line():
 
     parser.add_argument('--config',
                         type=str,
-                        default='/persist/sys/triggertrap.conf',
+                        default='/persist/sys/rphm.conf',
                         help='Specifies the configuration file to load' + \
-                        '(Default: /persist/sys/triggertrap.conf)'
+                        '(Default: /persist/sys/rphm.conf)'
                        )
 
     parser.add_argument('--debug',
@@ -100,7 +100,7 @@ def parse_cmd_line():
     #   parse_only   Only parse the command line.
     #   get          Get one set of interface stats and dump to console.
     #   trap         Send a test snmp trap.
-    #   snmp         Add random number to counters to trigger snmptraps
+    #   snmp         Add random number to counters to rphm snmptraps
     #                  and display args sent to snmptrap command
     parser.add_argument('--test',
                         type=str,
@@ -141,10 +141,10 @@ def remove_unneded_keys(keys, this_dict):
                 this_dict[section].pop(key, None)
 
 def read_config(filename):
-    """ Read the config file (Default: /persist/sys/triggertrap.conf)
+    """ Read the config file (Default: /persist/sys/rphm.conf)
 
     Read in settings from the config file.  The default:
-        /persist/sys/triggertrap.conf, is set in parse_cli().
+        /persist/sys/rphm.conf, is set in parse_cli().
 
     Args:
         filename (str): The path to the config file.
@@ -155,7 +155,7 @@ def read_config(filename):
     """
 
     if not filename:
-        filename = "/persist/sys/triggertrap.conf"
+        filename = "/persist/sys/rphm.conf"
 
     setting = {}
     defaults = {

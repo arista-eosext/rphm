@@ -1,10 +1,10 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 
 # XXX Need to add runtime dependencies
-Name: triggertrap
-Version: 0.1.1
+Name: rphm
+Version: 0.1.2
 Release: 1%{?dist}
-Summary: TriggerTrap Extension for Arista EOS
+Summary: Remote Port Health Manager (rphm) Extension for Arista EOS
 
 Group: Development/Libraries
 License: BSD (3-clause)
@@ -15,7 +15,7 @@ BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %description
-Triggertrap Extension for EOS is an extension that monitors interface counters and generates an SNMP trap when a threshold is crossed.
+Remote Port Health Manager (rphm) extension for EOS is an extension that monitors interface counters and generates an SNMP trap when a threshold is crossed.
 
 %prep
 %setup -q
@@ -32,7 +32,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,eosadmin,-)
-%{python_sitelib}/triggertrap*
-%{_bindir}/triggertrap
-#/usr/triggertrap.conf
-/persist/sys/triggertrap.conf
+%{python_sitelib}/rphm*
+%{_bindir}/rphm
+#/usr/rphm.conf
+/persist/sys/rphm.conf

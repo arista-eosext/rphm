@@ -30,8 +30,9 @@
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-''' Triggertrap is an extension for EOS which will monitor interfaces for
-    certain counters and generate SNMP traps when thresholds are exceeded.
+''' Remote Port Health Manager (rphm) is an extension for EOS which will monitor
+    interfaces for certain counters and generate SNMP traps when thresholds are
+    exceeded.
 '''
 __version__ = '0.1.2'
 __author__ = 'Arista Networks'

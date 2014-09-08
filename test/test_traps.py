@@ -29,13 +29,13 @@
 
 #pylint: disable=R0904,F0401,W0232,E1101
 
-#sys.path.append(os.path.join('..', 'triggertrap'))
+#sys.path.append(os.path.join('..', 'rphm'))
 import unittest
-from triggertrap import app
+from rphm import app
 
 
 class StatMonTests(unittest.TestCase):
-    """Unittests for triggertrap
+    """Unittests for rphm
     """
 
     def setUp(self):
@@ -291,7 +291,7 @@ class StatMonTests(unittest.TestCase):
 
 
 class GetDataTests(unittest.TestCase):
-    """Unittests for triggertrap
+    """Unittests for rphm
     """
 
     def setUp(self):

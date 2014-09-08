@@ -1,7 +1,7 @@
 #!/usr/bin/make
 # WARN: gmake syntax
 ########################################################
-# Makefile for triggertrap extension
+# Makefile for rphm extension
 #
 # useful targets:
 #   make clean ----- cleans distutils
@@ -15,7 +15,7 @@
 ########################################################
 # variable section
 
-NAME = "triggertrap"
+NAME = "rphm"
 
 PYTHON=python
 SITELIB = $(shell $(PYTHON) -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")
@@ -25,7 +25,7 @@ VERSION := $(shell cat VERSION)
 
 # RPM build parameters
 RPMSPECDIR = .
-RPMSPEC = $(RPMSPECDIR)/triggertrap.spec
+RPMSPEC = $(RPMSPECDIR)/rphm.spec
 RPMRELEASE = 1
 RPMNVR = "$(NAME)-$(VERSION)-$(RPMRELEASE)"
 
@@ -59,7 +59,7 @@ coverage: clean
 	PYTHONPATH=. nosetests --verbosity=3 -x --with-xunit \
 			   --xunit-file=junit-report.xml  \
 			   --with-coverage --cover-erase --cover-html \
-			   --cover-package=triggertrap --cover-branches
+			   --cover-package=rphm --cover-branches
 
 report:
 	coverage report -m
@@ -95,7 +95,7 @@ rpm: rpmcommon
 	-ba rpmbuild/$(NAME).spec
 	@rm -f rpmbuild/$(NAME).spec
 	@echo "---------------------------------------------"
-	@echo "Triggertrap RPM is built:"
+	@echo "rphm RPM is built:"
 	@echo "    rpmbuild/$(RPMNVR).rpm"
 	@echo "---------------------------------------------"
 

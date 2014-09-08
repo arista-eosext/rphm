@@ -38,7 +38,7 @@
 import os
 import unittest
 import sys
-sys.path.append(os.path.join('..', 'triggertrap'))
+sys.path.append(os.path.join('..', 'rphm'))
 
 class TestDevopsCmd(unittest.TestCase):
     ''' Test the devops command parsing. The command is executed using
@@ -50,7 +50,7 @@ class TestDevopsCmd(unittest.TestCase):
         ''' Run a test for each entry in the test parameters list verifying
             that the actual results equal the expected results.
         '''
-        cmd = 'bin/triggertrap'
+        cmd = 'bin/rphm'
         for i in range(len(test_params)):
             cmd_line, exp_ret_code = test_params[i]
             cmd_line = '%s %s' % (cmd, cmd_line)
@@ -71,7 +71,7 @@ class TestDevopsCmd(unittest.TestCase):
         # cmd_line_param  exp_return_value
         #
         test_params = [
-            ['--help --debug --test=trap --config=conf/triggertrap.conf',
+            ['--help --debug --test=trap --config=conf/rphm.conf',
              0],
         ]
         self._run_tests(test_params)

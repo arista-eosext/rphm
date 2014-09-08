@@ -44,7 +44,7 @@ from glob import glob
 #from distutils.core import setup
 from setuptools import setup, find_packages
 
-from triggertrap import __version__, __author__
+from rphm import __version__, __author__
 
 def find_modules(pkg):
     ''' Find the modules that belong in this package. '''
@@ -67,7 +67,7 @@ TEST_REQUIREMENTS = [
 
 
 setup(
-      name='triggertrap',
+      name='rphm',
       version=__version__,
       description='EOS extension to generate SNMP traps based on counter thresholds',
       long_description=open('README.md').read(),
@@ -77,10 +77,10 @@ setup(
       license='BSD-3',
       install_requires=INSTALL_REQUIREMENTS,
       tests_require=TEST_REQUIREMENTS,
-      packages=find_modules('triggertrap'),
+      packages=find_modules('rphm'),
       scripts=glob('bin/*'),
       data_files=[
-          (CONF_PATH, ['conf/triggertrap.conf'])
+          (CONF_PATH, ['conf/rphm.conf'])
       ]
 )
 

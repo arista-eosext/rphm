@@ -1,5 +1,5 @@
 include README.md INSTALL.md
-#recursive-include docs *
 recursive-include conf *
 include Makefile
+include CHANGELOG.md
 include requirements.txt
