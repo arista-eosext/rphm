@@ -46,6 +46,7 @@ from jsonrpclib import ProtocolError
 from subprocess import call
 
 SNMP_SETTINGS = None   #pylint: disable=C0103
+DEBUG = False   #pylint: disable=C0103
 
 def log(msg, level='INFO', error=False):
     """Logging facility setup.
@@ -58,13 +59,18 @@ def log(msg, level='INFO', error=False):
 
     """
 
-    if DEBUG:
-        print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
-
     if error:
         level = "ERR"
         print "ERROR: {0} ({1}) {2}".format(os.path.basename(sys.argv[0]),
                                             level, msg)
+
+    if DEBUG:
+        # Print to console
+        print "{0} ({1}) {2}".format(os.path.basename(sys.argv[0]), level, msg)
+    else:
+        if level == 'DEBUG':
+            # Don't send DEBUG messages unless --debug was also set.
+            return
 
     priority = ''.join(["syslog.LOG_", level])
     syslog.syslog(eval(priority), msg)
