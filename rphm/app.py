@@ -867,40 +867,33 @@ def main():
         print "Test=get: --------------------------\n"
         return 0
 
-    log("Started up successfully")
+    log("Started up successfully. Entering main loop...")
 
     reference = {}
 
-    log("Getting baseline counters from each device.")
-    for device in config['switches']:
-        log("Connecting to eAPI on {0}".format(device['name']))
-        device['eapi_obj'] = Server(device['url'])
-        try:
-            reference[device['hostname']] = get_device_counters(device)
-        except EapiException:
-            log("Connection error with eAPI.  Will retry device next pass",
-                error=True)
-            continue
-
-    log("Entering main loop...")
     while True:
-        log("---sleeping for {0} seconds.".format(config['counters']['poll']),
-            level='DEBUG')
-        time.sleep(int(config['counters']['poll']))
 
         for device in config['switches']:
-            log("Polling {0}".format(device['name']))
+            log("Polling {0} with eAPI".format(device['name']))
             current = {}
+
+            # Create the Server object on the first round
+            if device.get('eapi_obj', None) is None:
+                device['eapi_obj'] = Server(device['url'])
+
             try:
                 current = get_device_counters(device)
             except EapiException:
                 log("Connection error with eAPI.  Will retry device next pass",
                     error=True)
+                # Remove stale data
+                reference.pop(device['hostname'], None)
                 continue
 
-            if not reference.get(device['hostname'], None):
+            if reference.get(device['hostname'], None) is None:
                 # Have not contacted this device since startup or
                 # this is the first contact.  Continue to next device/itter.
+                log("Established contact with {0}".format(device['name']))
                 reference[device['hostname']] = dict(current)
                 continue
 
@@ -913,4 +906,8 @@ def main():
             # Copy current stats-->reference to reset the "deltas" for the
             #   next run.
             reference[device['hostname']] = dict(current)
+
+        log("---sleeping for {0} seconds.".format(config['counters']['poll']),
+            level='DEBUG')
+        time.sleep(int(config['counters']['poll']))
 
