@@ -48,6 +48,15 @@ from subprocess import call
 SNMP_SETTINGS = None   #pylint: disable=C0103
 DEBUG = False   #pylint: disable=C0103
 
+class EapiException(Exception):
+    """ An EapiException can be raised when there is a communication issue with
+    Arista eAPI on a switch. This mechanism is used to skip switches that may
+    not be accessible or configured properly, then automatically start
+    accessing them once they become available instead of failing.
+    """
+
+    pass
+
 def log(msg, level='INFO', error=False):
     """Logging facility setup.
 
@@ -428,6 +437,8 @@ def get_intf_counters(switch, interface="Management1"):
     """
     log("Entering {0}: {1}.".format(sys._getframe().f_code.co_name,
                                     interface), level='DEBUG')
+    conn_error = False
+
     commands = ["show interfaces {0}".format(interface)]
 
     response = None
@@ -440,10 +451,12 @@ def get_intf_counters(switch, interface="Management1"):
         if errno == 1002:
             log("Invalid EOS interface name ({0})".format(commands), error=True)
         else:
+            conn_error = True
             log("ProtocolError while retrieving {0} ([{1}] {2})".
                 format(commands, errno, msg),
                 error=True)
     except Exception, err:
+        conn_error = True
         #   60: Operation timed out
         #   61: Connection refused (http vs https?)
         #  401: Unauthorized
@@ -474,9 +487,10 @@ def get_intf_counters(switch, interface="Management1"):
                                                              err),
                     error=True)
 
-    if isinstance(response, list):
-        #pprint(response[0])
+    if conn_error:
+        raise EapiException("Connection error with eAPI")
 
+    if isinstance(response, list):
         # Normalize the interface name.  This ensures that, internally, we
         #   use "formal" names for the interfaces as returned in JSON.
         interface = response[0][u'interfaces'].keys()[0]
@@ -492,9 +506,14 @@ def get_device_counters(device):
 
     counters = {}
     for index, interface in enumerate(device['interfaces']):
-        (propername, counters[interface]) = get_intf_counters(device['eapi_obj'],
-                                                interface=interface)
+        try:
+            (propername, counters[interface]) = get_intf_counters(
+                device['eapi_obj'], interface=interface)
+        except EapiException:
+            raise
+
         if counters[interface] is None:
+            # Can't connect to
             counters.pop(interface)
         if interface != propername:
             device['interfaces'][index] = propername
@@ -520,28 +539,28 @@ def compare_counters(device, reference, current, test=None):
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
     diffs = {}
 
-    inputCounters = ['alignmentErrors',
-                     'fcsErrors',
-                     'giantFrames',
-                     'runtFrames',
-                     'rxPause',
-                     'symbolErrors',
-                     'inBroadcastPkts',
-                     'inDiscards',
-                     'inMulticastPkts',
-                     'inOctets',
-                     'inUcastPkts',
-                     'totalInErrors']
-    outputCounters = ['collisions',
-                      'deferredTransmissions',
-                      'lateCollisions',
-                      'txPause',
-                      'outBroadcastPkts',
-                      'outDiscards',
-                      'outMulticastPkts',
-                      'outOctets',
-                      'outUcastPkts',
-                      'totalOutErrors']
+    input_counters = ['alignmentErrors',
+                      'fcsErrors',
+                      'giantFrames',
+                      'runtFrames',
+                      'rxPause',
+                      'symbolErrors',
+                      'inBroadcastPkts',
+                      'inDiscards',
+                      'inMulticastPkts',
+                      'inOctets',
+                      'inUcastPkts',
+                      'totalInErrors']
+    output_counters = ['collisions',
+                       'deferredTransmissions',
+                       'lateCollisions',
+                       'txPause',
+                       'outBroadcastPkts',
+                       'outDiscards',
+                       'outMulticastPkts',
+                       'outOctets',
+                       'outUcastPkts',
+                       'totalOutErrors']
     # linkStatusChanges don't fall in to either category, exactly.
 
     for interface in reference:
@@ -568,11 +587,11 @@ def compare_counters(device, reference, current, test=None):
             continue
 
         diffs[interface] = {}
-        totalIn = list(get_all(ref, 'inUcastPkts'))[0] + \
+        total_in = list(get_all(ref, 'inUcastPkts'))[0] + \
             list(get_all(ref, 'inMulticastPkts'))[0] + \
             list(get_all(ref, 'inBroadcastPkts'))[0]
 
-        totalOut = list(get_all(ref, 'outUcastPkts'))[0] + \
+        total_out = list(get_all(ref, 'outUcastPkts'))[0] + \
             list(get_all(ref, 'outMulticastPkts'))[0] + \
             list(get_all(ref, 'outBroadcastPkts'))[0]
 
@@ -586,17 +605,17 @@ def compare_counters(device, reference, current, test=None):
                 continue
 
             #Check counter direction
-            if counter in inputCounters:
+            if counter in input_counters:
                 direction = "in"
-                total = totalIn
-            if counter in outputCounters:
+                total = total_in
+            if counter in output_counters:
                 direction = "out"
-                total = totalOut
+                total = total_out
             else:
                 #direction = "NA"
                 # linkStatusChanges don't fall in to either category, exactly.
                 direction = "in"
-                total = totalIn
+                total = total_in
 
             if test:
                 from random import randrange
@@ -856,7 +875,12 @@ def main():
     for device in config['switches']:
         log("Connecting to eAPI on {0}".format(device['name']))
         device['eapi_obj'] = Server(device['url'])
-        reference[device['hostname']] = get_device_counters(device)
+        try:
+            reference[device['hostname']] = get_device_counters(device)
+        except EapiException:
+            log("Connection error with eAPI.  Will retry device next pass",
+                error=True)
+            continue
 
     log("Entering main loop...")
     while True:
@@ -867,7 +891,19 @@ def main():
         for device in config['switches']:
             log("Polling {0}".format(device['name']))
             current = {}
-            current = get_device_counters(device)
+            try:
+                current = get_device_counters(device)
+            except EapiException:
+                log("Connection error with eAPI.  Will retry device next pass",
+                    error=True)
+                continue
+
+            if not reference.get(device['hostname'], None):
+                # Have not contacted this device since startup or
+                # this is the first contact.  Continue to next device/itter.
+                reference[device['hostname']] = dict(current)
+                continue
+
             get_device_status(device)
             changes = compare_counters(device, reference[device['hostname']],
                                        current, test=args['test'])
