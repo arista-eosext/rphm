@@ -3,7 +3,7 @@
 # XXX Need to add runtime dependencies
 Name: rphm
 Version: 1.0.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: Remote Port Health Manager (rphm) Extension for Arista EOS
 
 Group: Development/Libraries
@@ -35,4 +35,8 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/rphm*
 %{_bindir}/rphm
 #/usr/rphm.conf
-/persist/sys/rphm.conf
+%config(noreplace) /persist/sys/rphm.conf
+
+%changelog
+* Tue Sep 23 2014 Jere Julian <jere@arista.com> - 1.0.0-2
+- Add %config(noreplace) to rphm.conf
