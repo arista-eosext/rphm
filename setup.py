@@ -41,7 +41,7 @@
 import os
 
 from glob import glob
-#from distutils.core import setup
+
 from setuptools import setup, find_packages
 
 from rphm import __version__, __author__
@@ -56,7 +56,7 @@ def find_modules(pkg):
 
 INSTALL_ROOT = os.getenv('VIRTUAL_ENV', '')
 CONF_PATH = INSTALL_ROOT + '/persist/sys'
-#INSTALL_REQUIREMENTS = open('requirements.txt').read().split('\n')
+
 INSTALL_REQUIREMENTS = [
     'jsonrpclib'
     ]
@@ -72,8 +72,8 @@ setup(
       description='EOS extension to generate SNMP traps based on counter thresholds',
       long_description=open('README.md').read(),
       author=__author__,
-      author_email='eosplus-dev@aristanetworks.com',
-      url='http://eos.aristanetworks.com',
+      author_email='eosplus-dev@arista.com',
+      url='http://eos.arista.com',
       license='BSD-3',
       install_requires=INSTALL_REQUIREMENTS,
       tests_require=TEST_REQUIREMENTS,
