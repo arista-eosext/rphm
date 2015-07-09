@@ -745,7 +745,7 @@ def do_actions(device, changes, interval):
                    changes[interface][counter]['direction'])
 
             # system uptime
-            send_trap(trap_content, uptime=device['bootupTimestamp'])
+            send_trap(trap_content, uptime=int(device['bootupTimestamp']))
 
 def send_trap(message, uptime='', test=False):
     """ Send an Arista enterprise-specific SNMP trap containing message.
@@ -810,7 +810,7 @@ def send_trap(message, uptime='', test=False):
     generic_trapnum = '6'
     trap_oid = '.'.join([enterprise_oid, generic_trapnum])
 
-    trap_args.append("'"+str(uptime)+"'")
+    trap_args.append(str(uptime))
     trap_args.append(enterprise_oid)
     trap_args.append(trap_oid)
     trap_args.append('s')
