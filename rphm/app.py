@@ -175,9 +175,7 @@ def read_config(filename):
 
     setting = {}
     defaults = {
-        'hostname': 'localhost',
         'protocol': 'https',
-        'port': '443',
         'username': 'arista',
         'password': 'arista',
         'url': '%(protocol)s://%(username)s:%(password)s@%(hostname)s:%(port)s'\
@@ -229,6 +227,8 @@ def read_config(filename):
         'txPause'
     )
 
+    default_port = '443'
+
     os.path.isfile(filename)
     if not os.access(filename, os.R_OK):
         log("Unable to read config file {0}".format(filename))
@@ -248,6 +248,10 @@ def read_config(filename):
                 format(filename, err))
 
         setting[section] = {}
+        if 'hostname' not in options:
+            config.set(section, 'hostname', 'localhost')
+        if 'port' not in options:
+            config.set(section, 'port', default_port)
         for option in options:
             setting[section][option] = config.get(section, option)
 
@@ -272,6 +276,9 @@ def read_config(filename):
                 if device:
                     known_list = config.sections()
                     for section in config.sections():
+                        options = config.options(section)
+                        if 'hostname' not in options:
+                            config.set(section, 'hostname', device)
                         known_list.append(config.get(section, 'hostname'))
                     if device not in known_list:
                         config.add_section(device)
@@ -282,6 +289,15 @@ def read_config(filename):
     for section in config.sections():
         switch = {}
         config.set(section, 'name', section)
+        options = config.options(section)
+
+        if 'port' not in options:
+            proto = config.get(section, 'protocol')
+            if proto == 'http':
+                default_port = '80'
+            elif proto == 'https':
+                default_port = '443'
+            config.set(section, 'port', default_port)
 
         for option in config.options(section):
             switch[option] = config.get(section, option)
