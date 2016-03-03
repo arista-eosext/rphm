@@ -1,6 +1,6 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
 #
-# Copyright (c) 2014, Arista Networks, Inc.
+# Copyright (c) 2016, Arista Networks, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -596,13 +596,30 @@ def compare_counters(device, reference, current, test=None):
                 format(interface))
             continue
 
+        diffs[interface] = {}
+
+        if 'linkStatusChanges' in device['counters']:
+            ref_counter = list(get_all(ref, 'linkStatusChanges'))
+            cur_counter = list(get_all(cur, 'linkStatusChanges'))
+            tmp = is_delta_significant(device,
+                                       'linkStatusChanges',
+                                       ref_counter[0],
+                                       cur_counter[0],
+                                       cur_counter[0],
+                                       'in')
+            if tmp is not None:
+                diffs[interface][counter] = tmp
+                diffs[interface][counter]['current'] = current[interface][u'lineProtocolStatus']
+
         # Skip interfaces not in Up state.
         if current[interface][u'lineProtocolStatus'] != u'up':
-            log("Interface [{0}] is not up. Skipping...".
+            # Remove the interface entry if there were no linkStatusChanges found
+            if not diffs[interface].keys():
+                diffs.pop(interface)
+            log("Interface [{0}] is not up. Skipping counters...".
                 format(interface))
             continue
 
-        diffs[interface] = {}
         total_in = list(get_all(ref, 'inUcastPkts'))[0] + \
             list(get_all(ref, 'inMulticastPkts'))[0] + \
             list(get_all(ref, 'inBroadcastPkts'))[0]
@@ -612,6 +629,10 @@ def compare_counters(device, reference, current, test=None):
             list(get_all(ref, 'outBroadcastPkts'))[0]
 
         for counter in device['counters']:
+            if counter == 'linkStatusChanges':
+                # This counter checked separately
+                continue
+
             ref_counter = list(get_all(ref, counter))
             cur_counter = list(get_all(cur, counter))
 
@@ -748,17 +769,31 @@ def do_actions(device, changes, interval):
     for interface in changes:
         for counter in changes[interface]:
 
-            trap_content = "Device {0} {1}, interface {2}: {3}"\
-                " increasing at > {4} per {5} seconds. Found {6}/{7} packets {8}".\
-            format(hostname,
-                   device['modelName'],
-                   interface,
-                   counter,
-                   changes[interface][counter]['threshold'],
-                   interval,
-                   changes[interface][counter]['found'],
-                   changes[interface][counter]['total'],
-                   changes[interface][counter]['direction'])
+            if counter == 'linkStatusChanges':
+                trap_content = "Device {0} {1}, interface {2}: {3}"\
+                    " increasing at > {4} in {5} seconds. Found {6}/{7} changes."\
+                    " Currently {8}".\
+                format(hostname,
+                       device['modelName'],
+                       interface,
+                       counter,
+                       changes[interface][counter]['threshold'],
+                       interval,
+                       changes[interface][counter]['found'],
+                       changes[interface][counter]['total'],
+                       changes[interface][counter]['current'])
+            else:
+                trap_content = "Device {0} {1}, interface {2}: {3} increasing"\
+                    " at > {4} per {5} seconds. Found {6}/{7} packets {8}".\
+                format(hostname,
+                       device['modelName'],
+                       interface,
+                       counter,
+                       changes[interface][counter]['threshold'],
+                       interval,
+                       changes[interface][counter]['found'],
+                       changes[interface][counter]['total'],
+                       changes[interface][counter]['direction'])
 
             # system uptime
             send_trap(trap_content, uptime=int(device['bootupTimestamp']))
