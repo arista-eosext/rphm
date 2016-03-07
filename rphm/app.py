@@ -771,7 +771,7 @@ def do_actions(device, changes, interval):
 
             if counter == 'linkStatusChanges':
                 trap_content = "Device {0} {1}, interface {2}: {3}"\
-                    " increasing at > {4} in {5} seconds. Found {6}/{7} changes."\
+                    " increasing at least {4} in {5} seconds. Found {6}/{7} changes."\
                     " Currently {8}".\
                 format(hostname,
                        device['modelName'],
@@ -784,7 +784,7 @@ def do_actions(device, changes, interval):
                        changes[interface][counter]['current'])
             else:
                 trap_content = "Device {0} {1}, interface {2}: {3} increasing"\
-                    " at > {4} per {5} seconds. Found {6}/{7} packets {8}".\
+                    " at least {4} per {5} seconds. Found {6}/{7} packets {8}".\
                 format(hostname,
                        device['modelName'],
                        interface,
