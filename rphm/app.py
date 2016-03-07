@@ -608,8 +608,8 @@ def compare_counters(device, reference, current, test=None):
                                        cur_counter[0],
                                        'in')
             if tmp is not None:
-                diffs[interface][counter] = tmp
-                diffs[interface][counter]['current'] = current[interface][u'lineProtocolStatus']
+                diffs[interface]['linkStatusChanges'] = tmp
+                diffs[interface]['linkStatusChanges']['current'] = current[interface][u'lineProtocolStatus']
 
         # Skip interfaces not in Up state.
         if current[interface][u'lineProtocolStatus'] != u'up':
