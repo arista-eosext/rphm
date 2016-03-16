@@ -1,9 +1,14 @@
 # Remote Port Health Manager (rphm) extension for Arista EOS
 
 ## Overview
-The Remote Port Health Manager (rphm) extension monitors interface counters, then performs actions whenever such counters exceed given thresholds.  The first action generates an SNMP trap.  Other actions could include sending and email or taking corrective action on an erroring port.
+The Remote Port Health Manager (rphm) extension monitors interface counters,
+then performs actions whenever such selected counters exceed given thresholds.
+The default actions are to log a syslog message and generate an SNMP trap.
+Other actions could include sending and email or taking corrective action on an
+erroring port.
 
-This extension may be run directly on Arista EOS devices or on a separate monitoring station and can monitor 1 or many devices based on the config file.
+This extension may be run directly on Arista EOS devices or on a separate
+monitoring station and can monitor 1 or more devices based on the config file.
 
 ## License
 
@@ -31,44 +36,59 @@ RPM package:
 
 ## Install
 
-rphm can be installed directly on one or more EOS switches and run as a daemon, there, or centrally on a linux system to monitor multiple switches from one place.  While running it centrally reduces the load put on a switch, it also requires that eAPI on the switch be allowed from that workstation.   When run directly on a switch, eAPI may be restricted to localhost-only.  Additionally, SNMP traps will be sourced from the switch’s IP address.
+rphm can be installed directly on one or more EOS switches and run as a daemon,
+there, or centrally on a linux system to monitor multiple switches from one
+place.  While running it centrally reduces the load put on a switch, it also
+requires that eAPI on the switch be allowed from that workstation.   When run
+directly on a switch, eAPI may be restricted to localhost-only.  Additionally,
+SNMP traps will be sourced from the switch’s IP address when run on-device.
 
 ### On an EOS device
 ```
-EOS#copy scp://username@10.10.10.1/src/rphm/rpmbuild/rphm-1.0.0-1.rpm extension:
+EOS#copy scp://username@10.10.10.1/src/rphm/rpmbuild/rphm-1.1.0-1.rpm extension:
 Password:
-rphm-1.0.0-1.rpm                       100%   17KB  17.0KB/s   00:00    
+rphm-1.0.0-1.rpm                       100%   17KB  17.0KB/s   00:00
 Copy completed successfully.
 EOS#show extensions 
 Name                                       Version/Release           Status RPMs
 ------------------------------------------ ------------------------- ------ ----
-rphm-1.0.0-1.rpm                    1.0.0/1                   A, NI     1
+rphm-1.1.0-1.rpm                    1.1.0/1                   A, NI     1
 
 A: available | NA: not available | I: installed | NI: not installed | F: forced
 EOS#extension rphm-1.0.0-1.rpm
 EOS#show extensions
 Name                                       Version/Release           Status RPMs
 ------------------------------------------ ------------------------- ------ ----
-rphm-1.0.0-1.rpm                    1.0.0/1                   A, I      1
+rphm-1.1.0-1.rpm                    1.1.0/1                   A, I      1
 
 A: available | NA: not available | I: installed | NI: not installed | F: forced
 vEOS-1#
 ```
 
 ### On a linux system
-    rpm -Uvh rpmbuild/rphm-1.0.0-1.rpm
+    rpm -Uvh rpmbuild/rphm-1.1.0-1.rpm
+
+    Optionally, save
+    https://raw.githubusercontent.com/arista-eosext/rphm/master/systemd/rphm.service
+    as `/etc/systemd/system/rphm.service`. This will enable service management
+    with `systemctl {start|status|stop} rphm.service` commands.
 
 ### Configuration
-The configuration file contains SNMP settings, the poll timer, and information on which switch(es) and counter(s) to monitor.
+The configuration file contains SNMP settings, the poll timer, and information
+on which switch(es) and counter(s) to monitor.
 
 The default location for the config file is `/persist/sys/rphm.conf`.
+
+For any counter set to be monitored, a threshold must be defined and greater
+than zero.
 
 ## Usage
 
 ```
 usage: rphm [-h] [--config CONFIG] [--debug]
 
-Poll switches with eAPI then send SNMP trap on changes in interface error counters.
+Poll switches with eAPI then send SNMP trap on changes in interface error
+counters.
 
 optional arguments:
 -h, --help       show this help message and exit
@@ -85,7 +105,8 @@ optional arguments:
 
 ## EOS Configuration
 
-EOS eAPI must be configured on each monitored device.  At a minimum, this requires:
+EOS eAPI must be configured on each monitored device.  At a minimum, this
+requires:
 
 ```
 EOS#configure terminal
@@ -98,7 +119,7 @@ To execute rphm directly on the switch, add the following:
 
 ```
 EOS(config)#daemon rphm
-EOS(config-daemon-rphm)#command /usr/bin/rphm --test=snmp
+EOS(config-daemon-rphm)#command /usr/bin/rphm
 EOS(config)#end
 ```
 
@@ -119,23 +140,26 @@ EOS#show processes | include rphm
 EOS#config termintal
 EOS(config)#no daemon rphm
 EOS(config)#end
-EOS#no extension rphm-1.0.0-1.rpm
+EOS#no extension rphm-1.1.0-1.rpm
 ```
 
 ### Linux
 
 ```
-rpm -e rphm-1.0.0-1.rpm
+rpm -e rphm-1.1.0-1.rpm
 ```
 
 
 # Demo
 
-1. Copy snmptrapd-start and snmptrapd.conf from the demo/ directory to the receiver host, then execute
+1. Copy snmptrapd-start and snmptrapd.conf from the demo/ directory to the
+   receiver host, then execute
 
     ./snmptrapd-start
 
-2. On the client, in rphm.conf, enter the traphost and select which snmp version you with to use.  Then check your switch settings.   Defaults to https://arista:arista@localhost/command-api
+2. On the client, in rphm.conf, enter the traphost and select which snmp
+   version you with to use.  Then check your switch settings.   Defaults to
+   https://arista:arista@localhost/command-api
 
 3. Verify your SNMP configuration with
 
