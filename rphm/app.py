@@ -40,7 +40,7 @@ import time
 import os
 import sys
 import syslog
-from pprint import pprint
+from pprint import pprint, pformat
 from jsonrpclib import Server
 from jsonrpclib import ProtocolError
 from subprocess import call
@@ -145,15 +145,10 @@ def remove_unneded_keys(keys, this_dict):
     """
 
     log("Entering {0}.".format(sys._getframe().f_code.co_name), level='DEBUG')
-    #print "cleaning up keys"
     for section in this_dict:
-        #print "    cleaning up section {0}".format(section)
         for key in keys:
-            #print "        looking for {0}".format(key)
             key = key.lower()
             if key in this_dict[section]:
-                #print "        Found a match... deleting"
-                #del this_dict[section][key]
                 this_dict[section].pop(key, None)
 
 def read_config(filename):
@@ -268,21 +263,21 @@ def read_config(filename):
     # Convert switchList from a string to config sections with defaults
     #  then make sure a section exists for each one in the event that this
     #  is the only place this switch is included in the config.
-    #  Thsi has the added effect of picking up the defaults.
+    #  This has the added effect of picking up the defaults.
     if 'switchlist' in setting['switches']:
         for line in setting['switches']['switchlist'].split("\n"):
             for device in line.split(","):
                 device = device.strip('" \t')
                 if device:
-                    known_list = config.sections()
-                    for section in config.sections():
-                        options = config.options(section)
-                        if 'hostname' not in options:
-                            config.set(section, 'hostname', device)
-                        known_list.append(config.get(section, 'hostname'))
-                    if device not in known_list:
+                    switch_sections = config.sections()
+                    if device not in switch_sections:
                         config.add_section(device)
                         config.set(device, 'hostname', device)
+
+    if len(config.sections()) == 0:
+        log("No switches defined.  Adding default localhost section",
+            level='DEBUG')
+        config.add_section('localhost')
 
     # Any section remaining, should being a switch definition
     setting['switches'] = []
@@ -290,6 +285,9 @@ def read_config(filename):
         switch = {}
         config.set(section, 'name', section)
         options = config.options(section)
+
+        if 'hostname' not in options:
+            config.set(section, 'hostname', section)
 
         if 'port' not in options:
             proto = config.get(section, 'protocol')
@@ -383,8 +381,6 @@ def get_device_status(device):
 
     if device['name'] == "localhost":
         hostname = device['eapi_obj'].runCmds(1, ["show hostname"])
-        print "Hostname:"
-        pprint(hostname)
         device['name'] = hostname[0]['hostname']
 
 def get_intf_counters(switch, interface="Management1"):
@@ -728,6 +724,11 @@ def is_delta_significant(device, counter, ref, cur, total=0, direction="in"):
     except KeyError:
         log("No threshold set for {0} in the config file. Skipping.".
             format(counter), error=True)
+        return None
+
+    if threshold < 1:
+        log("Invalid threshold ({}) set for {} in the config file. Skipping.".
+            format(threshold, counter), error=True)
         return None
 
     log("Comparing {0}[{1}]: REF [{2}], CUR [{3}]. "
