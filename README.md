@@ -2,13 +2,13 @@
 
 ## Overview
 The Remote Port Health Manager (rphm) extension monitors interface counters,
-then performs actions whenever suchelected counters exceed given thresholds.
+then performs actions whenever such selected counters exceed given thresholds.
 The default actions are to log a syslog message and generate an SNMP trap.
 Other actions could include sending and email or taking corrective action on an
 erroring port.
 
 This extension may be run directly on Arista EOS devices or on a separate
-monitoring station and can monitor 1 or many devices based on the config file.
+monitoring station and can monitor 1 or more devices based on the config file.
 
 ## License
 
