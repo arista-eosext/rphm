@@ -45,8 +45,9 @@ from jsonrpclib import Server
 from jsonrpclib import ProtocolError
 from subprocess import call
 
-SNMP_SETTINGS = None   #pylint: disable=C0103
-DEBUG = False   #pylint: disable=C0103
+SNMP_SETTINGS = None   # pylint: disable=C0103
+DEBUG = False          # pylint: disable=C0103
+
 
 class EapiException(Exception):
     """ An EapiException can be raised when there is a communication issue with
@@ -56,6 +57,7 @@ class EapiException(Exception):
     """
 
     pass
+
 
 def log(msg, level='INFO', error=False):
     """Logging facility setup.
@@ -84,6 +86,7 @@ def log(msg, level='INFO', error=False):
     priority = ''.join(["syslog.LOG_", level])
     syslog.syslog(eval(priority), msg)
 
+
 def parse_cmd_line():
     """Parse the command line options and return an args dict.
 
@@ -102,7 +105,7 @@ def parse_cmd_line():
     parser.add_argument('--config',
                         type=str,
                         default='/persist/sys/rphm.conf',
-                        help='Specifies the configuration file to load' + \
+                        help='Specifies the configuration file to load' +
                         '(Default: /persist/sys/rphm.conf)'
                        )
 
@@ -151,6 +154,7 @@ def remove_unneded_keys(keys, this_dict):
             if key in this_dict[section]:
                 this_dict[section].pop(key, None)
 
+
 def read_config(filename):
     """ Read the config file (Default: /persist/sys/rphm.conf)
 
@@ -177,27 +181,27 @@ def read_config(filename):
                '/command-api',
         'interfaceList': 'Management 1',
         'counterList': 'alignmentErrors,fcsErrors,symbolErrors',
-        'traphost' : 'localhost',
-        'version' : '2c',
-        'community' : 'public',
-        'secLevel' : 'authPriv',
-        'contextName' : '',
-        'authProtocol' : 'SHA',
-        'authPassword' : '',
-        'privProtocol' : 'AES',
-        'privPassword' : '%(authPassword)s',
-        'inUcastPkts' : '1',
-        'inDiscards' : '1',
-        'alignmentErrors' : '1',
-        'fcsErrors' : '1',
-        'giantFrames' : '1',
-        'runtFrames' : '1',
-        'rxPause' : '1',
-        'symbolErrors' : '1',
-        'collisions' : '1',
-        'deferredTransmissions' : '1',
-        'lateCollisions' : '1',
-        'txPause' : '1'
+        'traphost': 'localhost',
+        'version': '2c',
+        'community': 'public',
+        'secLevel': 'authPriv',
+        'contextName': '',
+        'authProtocol': 'SHA',
+        'authPassword': '',
+        'privProtocol': 'AES',
+        'privPassword': '%(authPassword)s',
+        'inUcastPkts': '1',
+        'inDiscards': '1',
+        'alignmentErrors': '1',
+        'fcsErrors': '1',
+        'giantFrames': '1',
+        'runtFrames': '1',
+        'rxPause': '1',
+        'symbolErrors': '1',
+        'collisions': '1',
+        'deferredTransmissions': '1',
+        'lateCollisions': '1',
+        'txPause': '1'
     }
     switchkeys = (
         'hostname',
@@ -249,7 +253,6 @@ def read_config(filename):
             config.set(section, 'port', default_port)
         for option in options:
             setting[section][option] = config.get(section, option)
-
 
         # Remove standard sections so all we have left are switch customizations
         config.remove_section(section)
@@ -320,6 +323,7 @@ def read_config(filename):
 
     return setting
 
+
 def get_interfaces(switch):
     """Get all of the interfaces on a switch.
 
@@ -363,6 +367,7 @@ def get_interfaces(switch):
 
     return response[0][u'interfaceStatuses']
 
+
 def get_device_status(device):
     """Get interface uptime and model information
 
@@ -382,6 +387,7 @@ def get_device_status(device):
     if device['name'] == "localhost":
         hostname = device['eapi_obj'].runCmds(1, ["show hostname"])
         device['name'] = hostname[0]['hostname']
+
 
 def get_intf_counters(switch, interface="Management1"):
     """Get interface details for an interface
@@ -461,7 +467,8 @@ def get_intf_counters(switch, interface="Management1"):
         (errno, msg) = err[0]
         # 1002: invalid command
         if errno == 1002:
-            log("Invalid EOS interface name ({0})".format(commands), error=True)
+            log("Invalid EOS interface name ({0})".format(commands),
+                error=True)
         else:
             conn_error = True
             log("ProtocolError while retrieving {0} ([{1}] {2})".
@@ -510,6 +517,7 @@ def get_intf_counters(switch, interface="Management1"):
     else:
         return (interface, None)
 
+
 def get_device_counters(device):
     """ Get counters from a device and return a dict of results
 
@@ -531,6 +539,7 @@ def get_device_counters(device):
             device['interfaces'][index] = propername
 
     return counters
+
 
 def compare_counters(device, reference, current, test=None):
     """Compare the counters in 2 sets and return only differences
@@ -609,7 +618,8 @@ def compare_counters(device, reference, current, test=None):
 
         # Skip interfaces not in Up state.
         if current[interface][u'lineProtocolStatus'] != u'up':
-            # Remove the interface entry if there were no linkStatusChanges found
+            # Remove the interface entry if there were no linkStatusChanges
+            # found
             if not diffs[interface].keys():
                 diffs.pop(interface)
             log("Interface [{0}] is not up. Skipping counters...".
@@ -633,11 +643,11 @@ def compare_counters(device, reference, current, test=None):
             cur_counter = list(get_all(cur, counter))
 
             if not ref_counter or not cur_counter:
-                log("Counter [{0}] missing from Reference or Current data" \
+                log("Counter [{0}] missing from Reference or Current data"
                     " set. Skipping.".format(counter), error=True)
                 continue
 
-            #Check counter direction
+            # Check counter direction
             if counter in input_counters:
                 direction = "in"
                 total = total_in
@@ -645,7 +655,6 @@ def compare_counters(device, reference, current, test=None):
                 direction = "out"
                 total = total_out
             else:
-                #direction = "NA"
                 # linkStatusChanges don't fall in to either category, exactly.
                 direction = "in"
                 total = total_in
@@ -671,6 +680,7 @@ def compare_counters(device, reference, current, test=None):
 
     return diffs
 
+
 def get_all(data, key):
     """Return all values of a key in a multi-level dictionary
 
@@ -693,6 +703,7 @@ def get_all(data, key):
     for subset in sub_iter:
         for obj in get_all(subset, key):
             yield obj
+
 
 def is_delta_significant(device, counter, ref, cur, total=0, direction="in"):
     """Verify whether the difference in a counter value, if any, between two
@@ -737,9 +748,13 @@ def is_delta_significant(device, counter, ref, cur, total=0, direction="in"):
         level='DEBUG')
 
     if delta >= threshold:
-        return {'threshold': threshold, 'found': delta, 'total': total, 'direction': direction}
+        return {'threshold': threshold,
+                'found': delta,
+                'total': total,
+                'direction': direction}
     else:
         return None
+
 
 def do_actions(device, changes, interval):
     """ Perform actions for each delta noted in "changes"
@@ -799,6 +814,7 @@ def do_actions(device, changes, interval):
             # system uptime
             send_trap(trap_content, uptime=int(device['bootupTimestamp']))
 
+
 def send_trap(message, uptime='', test=False):
     """ Send an Arista enterprise-specific SNMP trap containing message.
 
@@ -821,7 +837,6 @@ def send_trap(message, uptime='', test=False):
     #
 
     # Build the arguments to snmptrap
-    #trap_args = ['snmptrap']
     trap_args = ['snmptrap']
     trap_args.append('-v')
     trap_args.append(SNMP_SETTINGS['version'])
@@ -855,7 +870,7 @@ def send_trap(message, uptime='', test=False):
             format(SNMP_SETTINGS['version']))
     trap_args.append(SNMP_SETTINGS['traphost'])
 
-    #.iso.org.dod.internet.private. .arista
+    # .iso.org.dod.internet.private. .arista
     # enterprises.30065
     enterprise_oid = '.1.3.6.1.4.1.30065'
     # enterpriseSpecific = 6
@@ -869,7 +884,8 @@ def send_trap(message, uptime='', test=False):
 
     if test == "trap":
         message = "Device TEST-Device, interface Management 1:" \
-            " FAKEalignmentErrors increasing at > 1 per 5 seconds. Found 7/2401 packets in"
+            " FAKEalignmentErrors increasing at > 1 per 5 seconds." \
+            " Found 7/2401 packets in"
         log("Sending SNMPTRAP to {0} with arguments: {1}".
             format(SNMP_SETTINGS['traphost'], trap_args), level='DEBUG')
 
@@ -880,6 +896,7 @@ def send_trap(message, uptime='', test=False):
         pprint(trap_args)
 
     call(trap_args)
+
 
 def main():
     ''' main execution routine for devops command. Parse the command
@@ -913,7 +930,8 @@ def main():
     elif args['test'] == 'get':
         print "Connecting to eAPI at {0}".format(config['switches'][0]['url'])
         switch = Server(config['switches'][0]['url'])
-        (interface, counters) = get_intf_counters(switch, interface="Management1")
+        (interface, counters) = get_intf_counters(switch,
+                                                  interface="Management1")
         print "\nTest=get: received the following counters from Management 1:"
         pprint(counters)
         print "Test=get: --------------------------\n"
@@ -962,4 +980,3 @@ def main():
         log("---sleeping for {0} seconds.".format(config['counters']['poll']),
             level='DEBUG')
         time.sleep(int(config['counters']['poll']))
-
