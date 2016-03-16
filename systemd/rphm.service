@@ -1,0 +1,16 @@
+# systemd script for RPHM.
+#
+# This file should be installed when running rphm on a central server which
+# manages system services with systemd.
+#
+# Install as /etc/systemd/system/rphm.service
+#
+[Unit]
+Description=Remote Port Health Monitor for Arista EOS devices
+After=syslog.target network.target
+
+[Service]
+ExecStart=/usr/bin/rphm
+
+[Install]
+WantedBy=multi-user.target
