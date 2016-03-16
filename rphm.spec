@@ -31,7 +31,7 @@ rm -rf $RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%defattr(-,root,eosadmin,-)
+%defattr(-,root,root,-)
 %{python_sitelib}/rphm*
 %{_bindir}/rphm
 #/usr/rphm.conf
