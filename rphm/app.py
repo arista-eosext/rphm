@@ -38,12 +38,14 @@ import argparse
 import ConfigParser
 import time
 import os
+import ssl
 import sys
 import syslog
 from pprint import pprint, pformat
 from jsonrpclib import Server
 from jsonrpclib import ProtocolError
 from subprocess import call
+
 
 SNMP_SETTINGS = None   # pylint: disable=C0103
 DEBUG = False          # pylint: disable=C0103
@@ -474,6 +476,11 @@ def get_intf_counters(switch, interface="Management1"):
             log("ProtocolError while retrieving {0} ([{1}] {2})".
                 format(commands, errno, msg),
                 error=True)
+    except ssl.SSLError, err:
+        if err.reason == u'CERTIFICATE_VERIFY_FAILED':
+            ssl._create_default_https_context = ssl._create_unverified_context
+            log("SSL Certificate verify error while retrieving {0}."
+                " Disabling certificate validation.".format(commands))
     except Exception, err:
         conn_error = True
         #   60: Operation timed out
