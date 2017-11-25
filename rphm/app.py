@@ -42,7 +42,7 @@ import ssl
 import sys
 import syslog
 from pprint import pprint, pformat
-from jsonrpclib import Server
+from jsonrpclib import Server, history
 from jsonrpclib import ProtocolError
 from subprocess import call
 
@@ -949,6 +949,7 @@ def main():
     reference = {}
 
     while True:
+        history.clear()
 
         for device in config['switches']:
             log("Polling {0} with eAPI".format(device['name']))
