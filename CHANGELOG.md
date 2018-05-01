@@ -1,3 +1,16 @@
+# 1.1.1 (April 2018)
+
+* Fix issue #8 by clearing the jsonrpclib history on each run to prevent a
+  possible memory issue.
+
+# 1.1.0 (March 2016)
+
+* Fix SysUptime string in SNMP traps
+* Fix layered defaults for config parameters
+* Fix linkStatus reporting when interfaces are down
+* Add systemd config file which can be used on linux workstations to start/stop
+  the rphm service. Must be installed manually.
+
 # 1.0.0 (September 2014)
 
 * Initial public release

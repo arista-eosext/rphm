@@ -34,5 +34,5 @@
     interfaces for certain counters and generate SNMP traps when thresholds are
     exceeded.
 '''
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 __author__ = 'Arista Networks'
